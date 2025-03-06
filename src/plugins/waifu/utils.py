@@ -3,6 +3,7 @@ import hashlib
 import io
 
 import httpx
+from nonebot import logger
 from nonebot.adapters.onebot.v11 import Message
 from pil_utils import Text2Image
 
@@ -36,24 +37,25 @@ async def user_img(user_id: int) -> str:
     data = await download_url(url)
     if hashlib.md5(data, usedforsecurity=False).hexdigest() == defualt_md5:
         url = f"https://q1.qlogo.cn/g?b=qq&nk={user_id}&s=100"
+    logger.info(f"头像url: {url}")
     return url
 
 
 def text_to_png(msg):
     """文字转png"""
     output = io.BytesIO()
-    Text2Image.from_text(
-        msg, 50, spacing=10,
-    ).to_image("white", (20, 20)).save(output, format="png")
+    Text2Image.from_text(msg, 50).to_image(bg_color="white", padding=(20, 20)).save(
+        output, format="png"
+    )
     return output
 
 
 def bbcode_to_png(msg, spacing: int = 10):
     """bbcode文字转png"""
     output = io.BytesIO()
-    Text2Image.from_bbcode_text(
-        msg, 50, spacing=spacing,
-    ).to_image("white", (20, 20)).save(output, format="png")
+    Text2Image.from_bbcode_text(msg, 50).to_image(
+        bg_color="white", padding=(20, 20)
+    ).save(output, format="png")
     return output
 
 

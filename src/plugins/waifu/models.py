@@ -1,64 +1,61 @@
-# 导入插件方法
 from nonebot_plugin_tortoise_orm import add_model
 from tortoise import fields
 from tortoise.models import Model
 
-add_model("src.plugins.waifu.models")
+add_model(__name__)
 
 
-class WaifuProtect(Model):
+class BaseGroupModel(Model):
     group_id = fields.BigIntField(pk=True)
-    # 列表
-    user_id: list[int] = fields.JSONField(default=[])
     created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+
+
+class WaifuProtect(BaseGroupModel):
+    user_ids = fields.JSONField(default=[])
 
     class Meta:
         table = "waifu_protect"
 
 
-class WaifuCP(Model):
-    group_id = fields.BigIntField(pk=True)
-    # 字典
-    affect: dict[str, int] = fields.JSONField(default={})
-    created_at = fields.DatetimeField(auto_now_add=True)
+class WaifuCP(BaseGroupModel):
+    affect = fields.JSONField(default={})
 
     class Meta:
         table = "waifu_cp"
 
 
-class PWaifu(Model):
-    group_id = fields.BigIntField(pk=True)
-    # 列表
-    waifu: list[int] = fields.JSONField(default=[])
-    created_at = fields.DatetimeField(auto_now_add=True)
+class PWaifu(BaseGroupModel):
+    waifu_list = fields.JSONField(default=[])
 
     class Meta:
         table = "waifu"
 
 
-class WaifuLock(Model):
-    group_id = fields.BigIntField(pk=True)
-    # 字典
-    lock: dict[str, int] = fields.JSONField(default={})
-    created_at = fields.DatetimeField(auto_now_add=True)
+class WaifuLock(BaseGroupModel):
+    lock = fields.JSONField(default={})
 
     class Meta:
         table = "waifu_lock"
 
 
-class Waifuyinppa1(Model):
+class YinpaRecord(Model):
     user_id = fields.BigIntField(pk=True)
-    count = fields.IntField(default=0)
-    created_at = fields.DatetimeField(auto_now_add=True)
+    active_count = fields.IntField(default=0)
+    passive_count = fields.IntField(default=0)
+    updated_at = fields.DatetimeField(auto_now=True)
 
     class Meta:
-        table = "waifu_yinppa1"
+        abstract = True
 
 
-class Waifuyinppa2(Model):
-    user_id = fields.BigIntField(pk=True)
-    count = fields.IntField(default=0)
-    created_at = fields.DatetimeField(auto_now_add=True)
-
+class YinpaActive(YinpaRecord):
     class Meta:
-        table = "waifu_yinppa2"
+        table = "yinpa_active"
+
+
+class YinpaPassive(YinpaRecord):
+    class Meta:
+        table = "yinpa_passive"
