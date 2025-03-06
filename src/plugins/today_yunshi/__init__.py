@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 from os import path
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import ujson as json
 from nonebot import logger, on_command
@@ -38,7 +39,9 @@ async def luck_result(user_id, focus: bool = False) -> str:
     if member_model is None:
         # 如果没有数据则创建数据
         result, luckid = random_luck()
-        await MemberData.create(user_id=user_id, luckid=luckid, time=datetime.now())
+        await MemberData.create(
+            user_id=user_id, luckid=luckid, time=datetime.now(ZoneInfo("Asia/Shanghai"))
+        )
     elif (
         member_model.time.strftime("%Y-%m-%d") == time.strftime("%Y-%m-%d")
         and not focus
@@ -55,7 +58,7 @@ async def luck_result(user_id, focus: bool = False) -> str:
         result, luckid = random_luck()
         logger.info(f"member_model.luckid2: {member_model.luckid}")
         member_model.luckid = luckid
-        member_model.time = datetime.now()
+        member_model.time = datetime.now(ZoneInfo("Asia/Shanghai"))
         await member_model.save()
     return result
 
@@ -64,14 +67,15 @@ def random_luck():
     """
     随机获取运势信息。
 
-
     Returns:
         tuple: 运势信息和选择的运势编号。
     """
     # 判断是否有在 json 文件中和是否有 time 键值
     r = random.choice(list(luckdata.keys()))
+    if datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%m-%d") == "01-01":
+        r = "67"
     result_text = (
         f"----\n{luckdata[r]['运势']}\n{luckdata[r]['星级']}\n"
         f"{luckdata[r]['签文']}\n{luckdata[r]['解签']}\n----"
     )
-    return result_text, r
+    return result_text, int(r)

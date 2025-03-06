@@ -42,13 +42,11 @@ driver.register_adapter(ONEBOT_V11Adapter)
 
 
 nonebot.load_from_toml("pyproject.toml")
-from async_lru import alru_cache
 from nonebot.message import event_preprocessor
 
 from U1.database import Channel
 
 
-@alru_cache(maxsize=128)
 async def get_channel(group_id: str):
     return await Channel.get_or_none(guildId=group_id)
 

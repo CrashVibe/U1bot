@@ -115,7 +115,7 @@ class Tarot:
         for i, card_info in enumerate(cards_info_list):
             # Select the #i tarot
             msg_header = MessageSegment.text(
-                f"{'切牌' if is_cut and i == cards_num - 1 else f'第{i+1}张牌'}「{representations[i]}」\n"
+                f"{'切牌' if is_cut and i == cards_num - 1 else f'第{i + 1}张牌'}「{representations[i]}」\n"
             )
 
             flag, msg_body = await self._get_text_and_image(theme, card_info)
