@@ -1,5 +1,5 @@
 import asyncio
-from typing import cast
+from typing import Optional, cast
 
 from cookit.loguru import warning_suppress
 from cookit.nonebot.alconna import RecallContext
@@ -40,7 +40,7 @@ JUMP_PAGE_PREFIX = ("page", "p", "跳页", "页")
 
 async def handle_song_or_list(
     result: GeneralSongOrList,
-    matcher: Matcher | None = None,
+    matcher: Optional[Matcher] = None,
     send_init_info: bool = False,
 ):
     if not matcher:
@@ -126,7 +126,7 @@ async def handle_song_or_list(
             )
 
     async def handle_page(
-        song_list: GeneralSongList | None,
+        song_list: Optional[GeneralSongList],
         result: GeneralGetPageReturn,
     ) -> GeneralSongList:
         if result is None:
@@ -216,7 +216,9 @@ def __register_searcher_matchers():
     def do_reg(searcher: type[BaseSearcher], commands: tuple[str, ...]):
         priv_cmd, *rest_cmds = commands
         matcher = on_command(
-            priv_cmd, aliases=set(rest_cmds), state={KEY_SEARCHER: searcher}, block=True
+            priv_cmd,
+            aliases=set(rest_cmds),
+            state={KEY_SEARCHER: searcher},
         )
         matcher.handle()(search_handler_0)
         matcher.handle()(search_handler_1)

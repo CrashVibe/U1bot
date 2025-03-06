@@ -26,7 +26,7 @@ async def resolve_handler(
 
 
 def __register_resolve_matchers():
-    matcher = on_command("解析", aliases={"resolve", "parse", "get"}, block=True)
+    matcher = on_command("解析", aliases={"resolve", "parse", "get"})
     matcher.handle()(resolve_handler)
     if config.ncm_auto_resolve:
         reg_matcher = on_regex(URL_REGEX)

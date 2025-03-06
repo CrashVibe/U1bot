@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+from collections.abc import Callable
 
 from nonebot import get_driver, logger
 from nonebot.adapters import Bot as BaseBot, Event as BaseEvent

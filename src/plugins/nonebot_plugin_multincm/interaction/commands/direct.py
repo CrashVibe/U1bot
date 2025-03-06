@@ -3,7 +3,7 @@ from nonebot.matcher import Matcher
 
 from ..resolver import ResolvedSong
 
-matcher_direct = on_command("直链", aliases={"direct"}, block=True)
+matcher_direct = on_command("直链", aliases={"direct"})
 
 
 @matcher_direct.handle()

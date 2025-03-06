@@ -1,7 +1,11 @@
 # ruff: noqa: E402
 
 from nonebot import get_driver
-from nonebot.plugin import PluginMetadata
+from nonebot.plugin import PluginMetadata, inherit_supported_adapters, require
+
+require("nonebot_plugin_alconna")
+require("nonebot_plugin_waiter")
+require("nonebot_plugin_htmlrender")
 
 from . import interaction as interaction
 from .config import ConfigModel, config
@@ -25,7 +29,7 @@ auto_resolve_tip = (
     "▶ Bot 会自动解析你发送的网易云链接\n" if config.ncm_auto_resolve else ""
 )
 
-__version__ = "1.1.1"
+__version__ = "1.1.5"
 __plugin_meta__ = PluginMetadata(
     name="MultiNCM",
     description="网易云多选点歌",
@@ -55,5 +59,9 @@ __plugin_meta__ = PluginMetadata(
     homepage="https://github.com/lgc-NB2Dev/nonebot-plugin-multincm",
     type="application",
     config=ConfigModel,
-    extra={"License": "MIT", "Author": "student_2333"},
+    supported_adapters=inherit_supported_adapters(
+        "nonebot_plugin_alconna",
+        "nonebot_plugin_waiter",
+    ),
+    extra={"License": "MIT", "Author": "LgCookie"},
 )

@@ -5,7 +5,7 @@ from nonebot_plugin_alconna.uniseg import UniMessage
 from ...render import render_lyrics
 from ..resolver import ResolvedSong
 
-matcher_lyric = on_command("歌词", aliases={"lrc", "lyric", "lyrics"}, block=True)
+matcher_lyric = on_command("歌词", aliases={"lrc", "lyric", "lyrics"})
 
 
 @matcher_lyric.handle()

@@ -38,9 +38,7 @@ async def _(matcher: Matcher, city: str):
         logger.warning(f"找不到城市: {city}")
         matcher.block = False
         await matcher.finish()
-
     img = await render(w_data)
-
     if DEBUG:
         debug_save_img(img)
 

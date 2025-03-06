@@ -1,8 +1,9 @@
 import asyncio as aio
 import mimetypes
 import random
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, List, NamedTuple, Optional, TypeVar
+from typing import NamedTuple, TypeVar
 
 import anyio
 from httpx import AsyncClient, Response
@@ -19,10 +20,10 @@ class BgData(NamedTuple):
 BGProviderType = Callable[[], Awaitable[BgData]]
 TBP = TypeVar("TBP", bound=BGProviderType)
 
-registered_bg_providers: Dict[str, BGProviderType] = {}
+registered_bg_providers: dict[str, BGProviderType] = {}
 
 
-def get_bg_files() -> List[Path]:
+def get_bg_files() -> list[Path]:
     if not config.ps_bg_local_path.exists():
         logger.warning("Custom background path does not exist, fallback to default")
         return [DEFAULT_BG_PATH]
@@ -39,7 +40,7 @@ def get_bg_files() -> List[Path]:
 BG_FILES = get_bg_files()
 
 
-def bg_provider(name: Optional[str] = None):
+def bg_provider(name: str | None = None):
     def deco(func: TBP) -> TBP:
         provider_name = name or func.__name__
         if provider_name in registered_bg_providers:
@@ -61,7 +62,7 @@ def resp_to_bg_data(resp: Response):
 async def loli():
     async with AsyncClient(
         follow_redirects=True,
-        proxies=config.proxy,
+        proxy=config.proxy,
         timeout=config.ps_req_timeout,
     ) as cli:
         return resp_to_bg_data(
@@ -73,7 +74,7 @@ async def loli():
 async def lolicon():
     async with AsyncClient(
         follow_redirects=True,
-        proxies=config.proxy,
+        proxy=config.proxy,
         timeout=config.ps_req_timeout,
     ) as cli:
         resp = await cli.get(
@@ -133,9 +134,9 @@ class BgPreloader:
         if preload_count < 1:
             raise ValueError("preload_count must be greater than 0")
         self.preload_count = preload_count
-        self.backgrounds: List[BgData] = []
-        self.tasks: List[aio.Task[None]] = []
-        self.task_signal: Optional[aio.Future[None]] = None
+        self.backgrounds: list[BgData] = []
+        self.tasks: list[aio.Task[None]] = []
+        self.task_signal: aio.Future[None] | None = None
         self.signal_wait_lock = aio.Lock()
 
     def _get_signal(self) -> aio.Future[None]:

@@ -37,7 +37,7 @@ stat_matcher = on_command(
 )
 
 
-async def _msg_pic(msg: UniMsg) -> Optional[BgData]:
+async def _msg_pic(msg: UniMsg) -> BgData | None:
     msg = (
         r
         if (

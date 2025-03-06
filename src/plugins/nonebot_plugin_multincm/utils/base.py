@@ -2,21 +2,23 @@ import asyncio
 import json
 import math
 import time
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Optional, Tuple, TypeVar
-from typing_extensions import ParamSpec
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from cookit import flatten
-from nonebot.adapters import Bot as BaseBot, Event as BaseEvent
+from nonebot.adapters import Bot as BaseBot
+from nonebot.adapters import Event as BaseEvent
 from nonebot.matcher import current_bot
 from nonebot.utils import run_sync
 from nonebot_plugin_alconna.uniseg import SupportScope, UniMessage
+from typing_extensions import ParamSpec
 from yarl import URL
 
 from ..config import config
 from ..const import DEBUG_DIR, DEBUG_ROOT_DIR
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from ..data_source import md
 
 P = ParamSpec("P")
@@ -29,11 +31,11 @@ def format_time(time: int) -> str:
     return f"{mm:0>2d}:{ss:0>2d}"
 
 
-def format_alias(name: str, alias: Optional[List[str]] = None) -> str:
-    return f'{name}（{"；".join(alias)}）' if alias else name
+def format_alias(name: str, alias: list[str] | None = None) -> str:
+    return f"{name}（{'；'.join(alias)}）" if alias else name
 
 
-def format_artists(artists: List["md.Artist"]) -> str:
+def format_artists(artists: list["md.Artist"]) -> str:
     return "、".join([x.name for x in artists])
 
 
@@ -45,7 +47,7 @@ def calc_min_index(page: int) -> int:
     return (page - 1) * config.ncm_list_limit
 
 
-def calc_min_max_index(page: int) -> Tuple[int, int]:
+def calc_min_max_index(page: int) -> tuple[int, int]:
     min_index = calc_min_index(page)
     max_index = min_index + config.ncm_list_limit
     return min_index, max_index
@@ -62,7 +64,7 @@ def is_debug_mode() -> bool:
 def write_debug_file(filename: str, content: Any):
     filename = filename.format(time=round(time.time() * 1000))
     path = DEBUG_DIR / filename
-    if isinstance(content, (bytes, bytearray)):
+    if isinstance(content, bytes | bytearray):
         path.write_bytes(content)
         return
     path.write_text(
@@ -101,7 +103,7 @@ async def ffmpeg_exists() -> bool:
     return code == 0
 
 
-async def encode_silk(path: Path, rate: int = 24000) -> Path:
+async def encode_silk(path: "Path", rate: int = 24000) -> "Path":
     silk_path = path.with_suffix(".silk")
     if silk_path.exists():
         return silk_path
@@ -123,7 +125,7 @@ async def encode_silk(path: Path, rate: int = 24000) -> Path:
         )
 
     try:
-        from pysilk import encode
+        from pysilk import encode # type: ignore
 
         await run_sync(encode)(pcm_path.open("rb"), silk_path.open("wb"), rate, rate)
     finally:
@@ -132,7 +134,7 @@ async def encode_silk(path: Path, rate: int = 24000) -> Path:
     return silk_path
 
 
-def merge_alias(song: "md.Song") -> List[str]:
+def merge_alias(song: "md.Song") -> list[str]:
     alias = song.tns.copy() if song.tns else []
     alias.extend(
         x for x in flatten(x.split("；") for x in song.alias) if x not in alias
@@ -141,10 +143,10 @@ def merge_alias(song: "md.Song") -> List[str]:
 
 
 def is_song_card_supported(
-    bot: Optional[BaseBot] = None,
-    event: Optional[BaseEvent] = None,
+    bot: BaseBot | None = None,
+    event: BaseEvent | None = None,
 ) -> bool:
     if bot is None:
         bot = current_bot.get()
     s = UniMessage.get_target(event, bot).scope
-    return bool(s and s == SupportScope.qq_client.value)
+    return not not s and s == SupportScope.qq_client.value
