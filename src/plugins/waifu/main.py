@@ -135,7 +135,7 @@ async def select_waifu(
     group_id = event.group_id
     user_id = event.user_id
     protected = await get_protected_users(group_id)
-
+    select = None
     # 尝试通过 @ 选择
     if at := get_message_at(event.message):
         select = await handle_at_selection(bot, event, at[0], protected, cp_record)
