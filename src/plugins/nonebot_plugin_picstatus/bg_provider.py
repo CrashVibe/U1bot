@@ -66,7 +66,7 @@ async def loli():
         timeout=config.ps_req_timeout,
     ) as cli:
         return resp_to_bg_data(
-            (await cli.get("https://www.loliapi.com/acg/pe/")).raise_for_status(),
+            (await cli.get("https://www.loliapi.com/acg/pe")).raise_for_status(),
         )
 
 
