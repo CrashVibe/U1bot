@@ -19,10 +19,6 @@ SUPERUSER_list = list(get_driver().config.superusers)
 addfriend = on_request()
 
 
-# 特殊账号
-special_qqid = ["3862130847"]
-
-
 def format_time(_time: int) -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_time))
 
