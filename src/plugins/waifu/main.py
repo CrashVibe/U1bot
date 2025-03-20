@@ -7,6 +7,8 @@ from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, Message
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_apscheduler import scheduler
+from tortoise.models import Model
+from tortoise.queryset import QuerySet
 
 from .config import Config
 from .models import (
@@ -14,8 +16,6 @@ from .models import (
     WaifuCP,
     WaifuLock,
     WaifuProtect,
-    YinpaActive,
-    YinpaPassive,
 )
 from .utils import get_message_at, user_img
 
@@ -72,8 +72,8 @@ happy_end = [
 cd_bye = {}
 
 
-async def safe_delete(query, using_db=None):
-    return await query.delete(using_db=using_db)
+async def safe_delete(query: QuerySet, using_db=None):
+    return await query.delete()
 
 
 async def reset_record():
@@ -82,18 +82,24 @@ async def reset_record():
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    models_to_clean = [WaifuCP, PWaifu, WaifuLock, YinpaActive, YinpaPassive]
+    models_to_clean = [WaifuCP, PWaifu, WaifuLock]
     for model in models_to_clean:
-        await safe_delete(model.filter(created_at__lt=yesterday))
+        await safe_delete(model.filter(created_at=yesterday))
 
 
 async def mo_reset_record():
     logger.info("手动重置娶群友记录")
-    await WaifuCP.all().delete()
-    await PWaifu.all().delete()
-    await WaifuLock.all().delete()
-    await YinpaActive.all().delete()
-    await YinpaPassive.all().delete()
+    yesterday = datetime.now(ZoneInfo("Asia/Shanghai")).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    models_to_clean: list[type[Model]] = [
+        WaifuCP,
+        PWaifu,
+        WaifuLock,
+    ]
+    for model in models_to_clean:
+        await safe_delete(model.filter(created_at=yesterday))
 
 
 on_command("重置记录", permission=SUPERUSER, block=True).append_handler(mo_reset_record)
