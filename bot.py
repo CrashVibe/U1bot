@@ -64,16 +64,14 @@ async def _(bot: Bot, event: GroupMessageEvent):
         return
     channel = await get_channel(str(event.group_id))
     if channel is None:
-        attempts = 0
-        while attempts < 3:
+        for _ in range(3):
             channel = await get_channel(str(event.group_id))
             if channel is not None:
                 break  # 重试直到找到频道
-            attempts += 1
-            if attempts == 3:
-                raise IgnoredException("未找到频道，忽略")
             await asyncio.sleep(0.5)
-    if channel is not None and channel.assignee != bot_qqid:
+    if channel is None:
+        raise IgnoredException("未找到频道，忽略")
+    if channel.assignee != bot_qqid:
         raise IgnoredException("机器人不是频道指定的机器人，忽略")
 
 
