@@ -45,8 +45,7 @@ __plugin_meta__ = PluginMetadata(
     supported_adapters=None,
 )
 
-Bot_NICKNAME = list(get_driver().config.nickname)
-Bot_NICKNAME: str = Bot_NICKNAME[0] if Bot_NICKNAME else "bot"
+Bot_NICKNAME: str = next(iter(get_driver().config.nickname), "姚奕")
 fishing = on_command("fishing", aliases={"钓鱼"}, block=True)
 stats = on_command("stats", aliases={"统计信息"}, block=True)
 backpack = on_command("backpack", aliases={"背包"}, block=True)
