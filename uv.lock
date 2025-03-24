@@ -690,14 +690,14 @@ wheels = [
 
 [[package]]
 name = "cookit"
-version = "0.10.0"
+version = "0.10.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/26/37/9efbeabdf4d15c1796dd39f1308d504a30e08528ad1dc48bd3c5f0657e3d/cookit-0.10.0.tar.gz", hash = "sha256:be9a2e59921d53fcaac16d134e1bdaf8f19025d7858951937acfc3f749b13d06", size = 34053 }
+sdist = { url = "https://files.pythonhosted.org/packages/45/70/e519edf5fe54362de9be7718c37cc9f0cf69f3d1f2b239e24036468b6b1d/cookit-0.10.1.tar.gz", hash = "sha256:dbac9d0307426451343cb64d73d9fe6666ca007ea3fe829c6e0206a27f5d433c", size = 34044 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/72/69f5294656860ecb61c9d50309444b6dc256f0c1fc2e960b1514316845d7/cookit-0.10.0-py3-none-any.whl", hash = "sha256:1cbb873236506d5f9451f4e7bb3ca70c4adbcabf874ff5f2e368f59ca5671de5", size = 35087 },
+    { url = "https://files.pythonhosted.org/packages/af/b8/d65adb15722db8a07ea5e1d3b1486ba3a22d838a518412182ae623d8918c/cookit-0.10.1-py3-none-any.whl", hash = "sha256:4751d7bc81cbd414be996abea635583d8cfa3b9c8c0e431956705ac63c2f6e98", size = 35099 },
 ]
 
 [[package]]
@@ -2313,11 +2313,11 @@ wheels = [
 
 [[package]]
 name = "setuptools"
-version = "76.1.0"
+version = "77.0.3"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fa/2b/287ade3a580869e6178cb37d045f54272b1f006f2c0ff6fad08db258d027/setuptools-76.1.0.tar.gz", hash = "sha256:4959b9ad482ada2ba2320c8f1a8d8481d4d8d668908a7a1b84d987375cd7f5bd", size = 1350273 }
+sdist = { url = "https://files.pythonhosted.org/packages/81/ed/7101d53811fd359333583330ff976e5177c5e871ca8b909d1d6c30553aa3/setuptools-77.0.3.tar.gz", hash = "sha256:583b361c8da8de57403743e756609670de6fb2345920e36dc5c2d914c319c945", size = 1367236 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/fb/47dc84839f2743553075c80d08543b3d0f498f42329141b6717504abcdfd/setuptools-76.1.0-py3-none-any.whl", hash = "sha256:34750dcb17d046929f545dec9b8349fe42bf4ba13ddffee78428aec422dbfb73", size = 1236933 },
+    { url = "https://files.pythonhosted.org/packages/a9/07/99f2cefae815c66eb23148f15d79ec055429c38fa8986edcc712ab5f3223/setuptools-77.0.3-py3-none-any.whl", hash = "sha256:67122e78221da5cf550ddd04cf8742c8fe12094483749a792d56cd669d6cf58c", size = 1255678 },
 ]
 
 [[package]]
@@ -2564,7 +2564,7 @@ requires-dist = [
     { name = "nonebot-adapter-onebot", specifier = ">=2.4.6" },
     { name = "nonebot-plugin-alconna", specifier = ">=0.55.0" },
     { name = "nonebot-plugin-apscheduler", specifier = ">=0.5.0" },
-    { name = "nonebot-plugin-htmlrender", specifier = ">=0.4.0" },
+    { name = "nonebot-plugin-htmlrender", specifier = "==0.4.0" },
     { name = "nonebot-plugin-localstore", specifier = ">=0.7.1" },
     { name = "nonebot-plugin-tortoise-orm", specifier = ">=0.1.4" },
     { name = "nonebot-plugin-userinfo", specifier = ">=0.2.6" },
