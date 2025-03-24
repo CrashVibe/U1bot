@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 from collections.abc import Callable
 
 from nonebot import get_driver, logger
@@ -10,16 +10,16 @@ from nonebot_plugin_userinfo import UserInfo, get_user_info
 from .config import config
 
 nonebot_run_time: datetime = datetime.now().astimezone()
-bot_connect_time: Dict[str, datetime] = {}
-recv_num: Dict[str, int] = {}
-send_num: Dict[str, int] = {}
+bot_connect_time: dict[str, datetime] = {}
+recv_num: dict[str, int] = {}
+send_num: dict[str, int] = {}
 
-bot_info_cache: Dict[str, UserInfo] = {}
-bot_avatar_cache: Dict[str, bytes] = {}
+bot_info_cache: dict[str, UserInfo] = {}
+bot_avatar_cache: dict[str, bytes] = {}
 
 driver = get_driver()
 
-SEND_APIS: Dict[str, Union[List[str], Callable[[str], bool]]] = {
+SEND_APIS: dict[str, list[str] | Callable[[str], bool]] = {
     # "BilibiliLive": [],  # 狗东西发消息不走 call_api
     "Console": ["send_msg"],
     "Ding": ["send"],
@@ -78,9 +78,9 @@ if config.ps_count_message_sent_event is not True:
     @BaseBot.on_called_api
     async def called_api(
         bot: BaseBot,
-        exc: Optional[Exception],
+        exc: Exception | None,
         api: str,
-        _: Dict[str, Any],
+        _: dict[str, Any],
         __: Any,
     ):
         if (
