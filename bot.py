@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,9 @@ def default_filter(record: "Record"):
     return record["level"].no >= levelno
 
 
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+
 # 移除 NoneBot 默认的日志处理器
 logger.remove(logger_id)
 # 添加新的日志处理器
@@ -30,6 +34,18 @@ logger.add(
     format=default_format,
     filter=default_filter,
 )
+
+
+logger.add(
+    f"{log_dir}/" + "{time}.log",  # 传入函数，每天自动更新日志路径
+    level="WARNING",
+    format=default_format,
+    rotation="00:00",
+    retention="7 days",
+    encoding="utf-8",
+    enqueue=True,
+)
+
 
 from nonebot.adapters.onebot.v11 import Adapter as ONEBOT_V11Adapter
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
