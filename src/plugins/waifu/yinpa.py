@@ -7,9 +7,8 @@ from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 from tortoise.expressions import F
 
 from .config import settings
-from .main import get_protected_users
 from .models import YinpaActive, YinpaPassive
-from .utils import get_message_at
+from .utils import get_message_at, get_protected_users
 
 cd_cache = TTLCache(maxsize=1000, ttl=3600)  # 1小时过期
 

@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel
 
 
-class Config(BaseModel, extra=Extra.ignore):
+class Config(BaseModel, extra="ignore"):
     waifu_cd_bye: int = 3600
     waifu_save: bool = True
     waifu_reset: bool = True

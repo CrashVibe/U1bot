@@ -1,12 +1,11 @@
 from io import BytesIO
 from pathlib import Path
-from typing import Optional, Union
 
 from nonebot.adapters.onebot.v11.message import Message, MessageSegment
 
 
 class MessageBuilder(Message):
-    def at(self, user_id: Union[int, str]) -> "MessageBuilder":
+    def at(self, user_id: int | str) -> "MessageBuilder":
         self.append(MessageSegment.at(user_id))
         return self
 
@@ -16,11 +15,11 @@ class MessageBuilder(Message):
 
     def image(
         self,
-        file: Union[str, bytes, BytesIO, Path],
-        type_: Optional[str] = None,
+        file: str | bytes | BytesIO | Path,
+        type_: str | None = None,
         cache: bool = True,
         proxy: bool = True,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> "MessageBuilder":
         self.append(MessageSegment.image(file, type_, cache, proxy, timeout))
         return self
@@ -36,4 +35,4 @@ class MessageBuilder(Message):
         return self
 
     def done(self) -> str:
-        return str().join(map(str, self))
+        return "".join(map(str, self))

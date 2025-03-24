@@ -2,7 +2,7 @@ from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageSegment
 
 from .models import PWaifu, WaifuCP
-from .utils import bbcode_to_png
+from .utils import bbcode_to_png, get_bi_mapping
 
 cp_list = on_command("本群CP", block=True)
 
@@ -24,7 +24,9 @@ async def show_cp_list(bot: Bot, event: GroupMessageEvent):
     else:
         seen = set()
         for waifu_id in waifu_data.waifu_list:
-            if (user_id := cp_data.affect.get(str(waifu_id))) and user_id not in seen:
+            if (
+                user_id := get_bi_mapping(cp_data.affect, waifu_id)
+            ) and user_id not in seen:
                 user = await bot.get_group_member_info(
                     group_id=group_id, user_id=user_id
                 )

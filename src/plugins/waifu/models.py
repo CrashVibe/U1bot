@@ -1,5 +1,6 @@
 from nonebot_plugin_tortoise_orm import add_model
 from tortoise import fields
+from tortoise.fields.base import Field
 from tortoise.models import Model
 
 add_model(__name__)
@@ -14,21 +15,21 @@ class BaseGroupModel(Model):
 
 
 class WaifuProtect(BaseGroupModel):
-    user_ids = fields.JSONField(default=[])
+    user_ids: Field[list[int]] = fields.JSONField(default=list)
 
     class Meta:
         table = "waifu_protect"
 
 
 class WaifuCP(BaseGroupModel):
-    affect = fields.JSONField(default={})
+    affect: Field[dict[str, int]] = fields.JSONField(default=dict)
 
     class Meta:
         table = "waifu_cp"
 
 
 class PWaifu(BaseGroupModel):
-    waifu_list = fields.JSONField(default=[])
+    waifu_list: Field[list[int]] = fields.JSONField(default=[])
 
     class Meta:
         table = "waifu"

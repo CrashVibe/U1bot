@@ -6,6 +6,7 @@ from nonebot import on_command
 from nonebot.adapters.onebot.v11 import GroupMessageEvent
 
 from .models import PWaifu, WaifuCP, WaifuLock
+from .utils import get_bi_mapping, get_bi_mapping_contains
 
 # 初始化全局缓存
 last_reset_cache = TTLCache(maxsize=1000, ttl=86400)  # 24小时过期
@@ -20,7 +21,7 @@ async def handle_divorce(event: GroupMessageEvent):
     group_id = event.group_id
 
     if cp := await WaifuCP.get_or_none(group_id=group_id):
-        if str(user_id) not in cp.affect:
+        if not get_bi_mapping_contains(cp.affect, user_id):
             await bye.finish("你还没结婚呢...", at_sender=True)
 
     # 正常CD逻辑
@@ -30,21 +31,6 @@ async def handle_divorce(event: GroupMessageEvent):
     # 执行离婚
     await process_divorce(group_id, user_id)
     await bye.finish(random.choice(["嗯。", "...", "好。", "哦。", "行。"]))
-
-
-async def clear_waifu_records(group_id: int, user_id: int):
-    """清理所有婚姻记录"""
-    # WaifuCP
-    if cp := await WaifuCP.get_or_none(group_id=group_id):
-        if str(user_id) in cp.affect:
-            del cp.affect[str(user_id)]
-            await cp.save()
-
-    # PWaifu
-    if pwaifu := await PWaifu.get_or_none(group_id=group_id):
-        if str(user_id) in pwaifu.waifu_list:
-            pwaifu.waifu_list.remove(str(user_id))
-            await pwaifu.save()
 
 
 def check_divorce_cd(user_id: int) -> bool:
@@ -69,19 +55,19 @@ async def process_divorce(group_id: int, user_id: int):
     # 删除 CP 记录
     cp_record = await WaifuCP.get_or_none(group_id=group_id)
     if cp_record:
-        waifu_id = cp_record.affect.get(str(user_id))
+        waifu_id = get_bi_mapping(cp_record.affect, user_id)
         if waifu_id:
-            del cp_record.affect[str(user_id)]
-            del cp_record.affect[str(waifu_id)]
+            cp_record.affect.pop(str(user_id), None)
+            cp_record.affect.pop(str(waifu_id), None)
             await cp_record.save()
 
     # 删除 Waifu 记录
     waifu_record = await PWaifu.get_or_none(group_id=group_id)
     if waifu_record:
         if str(user_id) in waifu_record.waifu_list:
-            waifu_record.waifu_list.remove(str(user_id))
+            waifu_record.waifu_list.remove(user_id)
         if waifu_id and str(waifu_id) in waifu_record.waifu_list:
-            waifu_record.waifu_list.remove(str(waifu_id))
+            waifu_record.waifu_list.remove(waifu_id)
         await waifu_record.save()
 
     # 删除锁记录

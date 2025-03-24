@@ -7,6 +7,8 @@ from nonebot import logger
 from nonebot.adapters.onebot.v11 import Message
 from pil_utils import Text2Image
 
+from .models import WaifuProtect
+
 defualt_md5 = "acef72340ac0e914090bd35799f5594e"
 
 
@@ -62,3 +64,33 @@ def bbcode_to_png(msg, spacing: int = 10):
 def get_message_at(message: Message) -> list:
     """获取at列表"""
     return [int(msg.data["qq"]) for msg in message if msg.type == "at"]
+
+
+def get_bi_mapping(data, input_value: int) -> None | int:
+    """获取双向映射的值"""
+    k_to_v = {str(k): str(v) for k, v in data.items()}  # k -> v
+    v_to_k = {str(v): str(k) for k, v in data.items()}  # v -> k
+
+    if str(input_value) in k_to_v:
+        return int(k_to_v[str(input_value)])
+    elif str(input_value) in v_to_k:
+        return int(v_to_k[str(input_value)])
+    else:
+        return None
+
+
+def get_bi_mapping_contains(data: dict, input_value: int) -> bool:
+    """检查值是否在字典的键或值中"""
+    input_str = str(input_value)
+
+    # 使用双向映射，检查键或值是否存在
+    k_to_v = {str(k): str(v) for k, v in data.items()}  # k -> v
+    v_to_k = {str(v): str(k) for k, v in data.items()}  # v -> k
+
+    # 判断是否在键或值中
+    return input_str in k_to_v or input_str in v_to_k
+
+
+async def get_protected_users(group_id: int) -> list[int]:
+    protect = await WaifuProtect.get_or_none(group_id=group_id)
+    return protect.user_ids if protect else []
