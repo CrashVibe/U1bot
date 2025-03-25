@@ -1,9 +1,10 @@
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
-from collections.abc import Callable
 
 from nonebot import get_driver, logger
-from nonebot.adapters import Bot as BaseBot, Event as BaseEvent
+from nonebot.adapters import Bot as BaseBot
+from nonebot.adapters import Event as BaseEvent
 from nonebot.message import event_preprocessor
 from nonebot_plugin_userinfo import UserInfo, get_user_info
 

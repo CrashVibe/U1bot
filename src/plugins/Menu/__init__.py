@@ -17,8 +17,11 @@ dir_path = Path(__file__).parent
 
 markdown_path = dir_path / "markdown"
 
+
 async def get_reply(name: str):
-    return await md_to_pic(md_path=str(markdown_path / f"{name}.md"),css_path=str(dir_path / "dark.css"))
+    return await md_to_pic(
+        md_path=str(markdown_path / f"{name}.md"), css_path=str(dir_path / "dark.css")
+    )
 
 
 menu = on_command("菜单", aliases={"cd", "功能", "帮助", "help"}, block=True)
@@ -45,18 +48,18 @@ async def _(bot: V11Bot, matcher: Matcher, arg: V11Msg = CommandArg()):
     match_result = re.match(r"^(?P<name>.*?)$", msg)
     if not match_result:
         return
-
+    plugin_name_result = None
     plugin_name: str = match_result["name"]
     if plugin_name.isdigit():
         plugin_name_result = plugin_list.get(plugin_name)
         if plugin_name_result is None:
             await matcher.finish("插件序号不存在")
     else:
-        for _, value in plugin_list:
+        for _, value in plugin_list.items():
             if plugin_name in value:
                 plugin_name_result = value
-        if not plugin_name_result:
-            await matcher.finish("插件名过于模糊或不存在")
+    if not plugin_name_result:
+        await matcher.finish("插件名过于模糊或不存在")
 
     if plugin_name_result not in cache_plugin_img:
         try:
