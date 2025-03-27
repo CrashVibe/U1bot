@@ -70,6 +70,12 @@ async def get_channel(group_id: str):
 @event_preprocessor
 async def _(bot: Bot, event: GroupMessageEvent):
     "防止机器人自言自语"
+    # if (
+    #     event.group_id == 713478803 or event.group_id == 966016220
+    # ) and bot.self_id == "3862130847":
+    #     return
+    # else:
+    #     raise IgnoredException("正在测试中，忽略")
     # 检测是否是机器人自己发的消息
     bots = nonebot.get_bots()
     if event.get_user_id() in bots.keys():

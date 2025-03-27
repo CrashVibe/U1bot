@@ -87,6 +87,7 @@ dependencies = [
     "setuptools>=75.8.0",
     "pil-utils>=0.1.12",
     "httpx==0.27.2",
+    "tortoise-orm[accel,asyncmy]>=0.24.2",
 ]
 name = "u1bot"
 version = "0.1.0"
