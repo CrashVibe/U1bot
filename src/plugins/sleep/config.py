@@ -10,7 +10,7 @@ class Config(BaseModel, extra="ignore"):
     morning_mult_get_up_interval: int = 6
 
     morning_super_get_up_enable: bool = False
-    morning_super_get_up_interval: int = 3
+    morning_super_get_up_interval: int = 1
 
     night_night_intime_enable: bool = True
     night_night_intime_early_time: int = 21
