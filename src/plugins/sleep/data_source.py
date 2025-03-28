@@ -8,6 +8,8 @@ from nonebot.adapters.onebot.v11 import MessageSegment
 from .config import settings
 from .models import SleepGroupModel, SleepUserModel
 from .utils import (
+    check_morning_time_in_range,
+    check_night_time_in_range,
     get_adjusted_minutes,
     isTimeInMorningRange,
     isTimeInNightRange,
@@ -218,14 +220,20 @@ async def get_all_morning_night_data(
     sleeping_count = 0
     getting_up_count = 0
     now_time = datetime.now(ZoneInfo("Asia/Shanghai"))
+    # 输出下面条件判断的所有判断
     for user in all_users:
-        if (
-            user.night_time
-            and not user.morning_time
-            and user.night_time.date() == now_time.date()
-        ):
-            sleeping_count += 1
-        if user.morning_time and user.morning_time.date() == now_time.date():
+        is_night_time = user.night_time and check_night_time_in_range(
+            user.night_time, now_time
+        )
+        is_morning_time = user.morning_time and check_morning_time_in_range(
+            user.morning_time, now_time
+        )
+
+        if is_night_time:
+            if not is_morning_time:
+                sleeping_count += 1
+
+        if is_morning_time:
             getting_up_count += 1
 
     # 本群数据

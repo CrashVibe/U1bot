@@ -5,8 +5,8 @@ from nonebot import on_fullmatch, on_startswith
 from nonebot.adapters import Bot
 from nonebot.adapters.onebot.v11 import GroupMessageEvent
 
+from . import scheduler
 from .data_source import get_all_morning_night_data, get_morning_msg, get_night_msg
-from .scheduler import scheduler
 
 __all__ = ["scheduler"]
 

@@ -75,6 +75,34 @@ def get_adjusted_minutes(time_obj: "_Time") -> tuple[int, bool]:
     total = hour * 60 + minutes
     if 0 <= hour < settings.night_night_intime_late_time:  # 凌晨时段（0点-x点）
         return total + 1440, True
-    elif 22 <= hour <= 23:
+    elif settings.night_night_intime_early_time <= hour <= 23:
         return total, False
     raise ValueError("时间不在范围内")
+
+
+def check_night_time_in_range(sleep_time: datetime, now_time: datetime) -> bool:
+    """
+    检查现在时间是否在晚安范围内
+    """
+    if now_time.hour >= settings.night_night_intime_early_time:
+        return sleep_time.hour >= settings.night_night_intime_early_time
+
+    if sleep_time.date() == now_time.date():
+        return True
+
+    if sleep_time.date() == now_time.date() - timedelta(days=1):
+        return sleep_time.hour >= settings.night_night_intime_early_time
+
+    return False
+
+
+def check_morning_time_in_range(morning_time: datetime, now_time: datetime) -> bool:
+    """
+    检查现在时间是否在早安范围内
+    """
+    return (
+        settings.morning_morning_intime_early_time
+        <= now_time.hour
+        <= settings.morning_morning_intime_late_time
+        and morning_time.date() == now_time.date()
+    )
