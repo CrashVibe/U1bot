@@ -1,8 +1,5 @@
 import httpx
 from nonebot import logger, on_command
-from nonebot.adapters import Message
-from nonebot.matcher import Matcher
-from nonebot.params import CommandArg
 from nonebot.plugin import PluginMetadata
 
 __help_version__ = "0.1.0"
@@ -18,15 +15,12 @@ hitokoto_matcher = on_command("网抑云", aliases={"网易云热评"}, block=Tr
 
 
 @hitokoto_matcher.handle()
-async def hitokoto(matcher: Matcher, args: Message = CommandArg()):
-    if args:
-        return
+async def hitokoto():
     async with httpx.AsyncClient(verify=False) as client:
-        response = await client.get("https://api.uomg.com/api/comments.163?format=json")
+        response = await client.get(r"https://international.v1.hitokoto.cn/?c=j")
     if response.is_error:
         logger.error("获取网抑云失败咯，请稍后再试...")
         return
+    logger.info(response.text)
     data = response.json()
-    await matcher.finish(
-        data["data"]["content"] + " ——网易云音乐热评《" + data["data"]["name"] + "》"
-    )
+    await hitokoto_matcher.finish(data["hitokoto"] + " ——《" + data["creator"] + "》")
