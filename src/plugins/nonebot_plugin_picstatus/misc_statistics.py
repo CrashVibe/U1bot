@@ -70,8 +70,10 @@ if config.ps_count_message_sent_event:
                 )
             )
         ):
-            # logger.debug(f"Bot {bot.self_id} sent counter +1")
-            send_num[bot.self_id] += 1
+            if bot.self_id in send_num:
+                send_num[bot.self_id] += 1
+            else:
+                send_num[bot.self_id] = 1
 
 
 if config.ps_count_message_sent_event is not True:
