@@ -4,8 +4,6 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    # avoid sphinx autodoc resolve annotation failed
-    # because loguru module do not have `Logger` class actually
     from loguru import Record
 
 import nonebot
@@ -59,7 +57,6 @@ driver.register_adapter(ONEBOT_V11Adapter)
 
 nonebot.load_from_toml("pyproject.toml")
 from nonebot.message import event_preprocessor
-
 from U1.database import Channel
 
 
@@ -70,17 +67,6 @@ async def get_channel(group_id: str):
 @event_preprocessor
 async def _(bot: Bot, event: GroupMessageEvent):
     "防止机器人自言自语"
-    # if (
-    #     event.group_id == 713478803 or event.group_id == 966016220
-    # ) and bot.self_id == "3862130847":
-    #     return
-    # else:
-    #     raise IgnoredException("正在测试中，忽略")
-    # 检测是否是机器人自己发的消息
-    bots = nonebot.get_bots()
-    if event.get_user_id() in bots.keys():
-        raise IgnoredException("机器人自己发的消息，忽略")
-    "防止双发"
     bot_qqid = bot.self_id
     if event.to_me:
         return

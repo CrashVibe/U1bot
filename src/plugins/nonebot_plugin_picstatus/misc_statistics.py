@@ -96,7 +96,10 @@ if config.ps_count_message_sent_event is not True:
             and method_is_send_msg(bot.adapter.get_name(), api)
         ):
             # logger.debug(f"Bot {bot.self_id} sent counter +1")
-            send_num[bot.self_id] += 1
+            if bot.self_id in send_num:
+                send_num[bot.self_id] += 1
+            else:
+                send_num[bot.self_id] = 1
 
 
 @driver.on_bot_connect
@@ -119,7 +122,10 @@ async def _(bot: BaseBot):
 @event_preprocessor
 async def _(bot: BaseBot, event: BaseEvent):
     if event.get_type() == "message":
-        recv_num[bot.self_id] += 1
+        if bot.self_id in send_num:
+            send_num[bot.self_id] += 1
+        else:
+            send_num[bot.self_id] = 1
 
 
 async def cache_bot_info(bot: BaseBot, event: BaseEvent):
