@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from nonebot import on_fullmatch, on_startswith
@@ -6,7 +6,12 @@ from nonebot.adapters import Bot
 from nonebot.adapters.onebot.v11 import GroupMessageEvent
 
 from . import scheduler
-from .data_source import get_all_morning_night_data, get_morning_msg, get_night_msg
+from .data_source import (
+    get_all_morning_night_data,
+    get_morning_msg,
+    get_night_msg,
+    get_weekly_sleep_data,
+)
 
 __all__ = ["scheduler"]
 
@@ -97,3 +102,71 @@ async def _(bot: Bot, event: GroupMessageEvent):
     )
 
     await statistics.finish(msg, reply_message=True)
+
+
+# 我的作息
+
+my_sleep = on_fullmatch(msg="我的作息")
+
+
+@my_sleep.handle()
+async def _(bot: Bot, event: GroupMessageEvent):
+    uid = event.user_id
+
+    user_data = await get_weekly_sleep_data(uid)
+
+    if isinstance(user_data, str):
+        await my_sleep.finish(user_data, reply_message=True)
+
+    (
+        weekly_sleep_time,
+        weekly_morning_cout,
+        weekly_night_cout,
+        weekly_earliest_morning_time,  # datetime | str
+        weekly_latest_night_time,  # datetime | str
+        lastweek_sleep_time,
+        lastweek_morning_cout,
+        lastweek_night_cout,
+        lastweek_earliest_morning_time,  # datetime | str
+        lastweek_latest_night_time,  # datetime | str
+    ) = user_data
+
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y年%m月%d日")
+
+    if isinstance(weekly_earliest_morning_time, datetime):
+        weekly_earliest_morning_time = weekly_earliest_morning_time.strftime(
+            "%Y年%m月%d日 %H:%M:%S"
+        )
+    if isinstance(weekly_latest_night_time, datetime):
+        weekly_latest_night_time = weekly_latest_night_time.strftime(
+            "%Y年%m月%d日 %H:%M:%S"
+        )
+    if isinstance(lastweek_earliest_morning_time, datetime):
+        lastweek_earliest_morning_time = lastweek_earliest_morning_time.strftime(
+            "%Y年%m月%d日 %H:%M:%S"
+        )
+    if isinstance(lastweek_latest_night_time, datetime):
+        lastweek_latest_night_time = lastweek_latest_night_time.strftime(
+            "%Y年%m月%d日 %H:%M:%S"
+        )
+
+    msg = (
+        f"✨ 我的作息 ({today}) ✨\n"
+        f"╔═══════════\n"
+        f"║ 本周统计:\n"
+        f"║  睡觉时长: {weekly_sleep_time}分钟\n"
+        f"║  早安次数: {weekly_morning_cout}\n"
+        f"║  晚安次数: {weekly_night_cout}\n"
+        f"║  最早起床: {weekly_earliest_morning_time}\n"
+        f"║  最晚睡觉: {weekly_latest_night_time}\n"
+        f"╠═══════════\n"
+        f"║ 上周统计:\n"
+        f"║  睡觉时长: {lastweek_sleep_time}分钟\n"
+        f"║  早安次数: {lastweek_morning_cout}\n"
+        f"║  晚安次数: {lastweek_night_cout}\n"
+        f"║  最早起床: {lastweek_earliest_morning_time}\n"
+        f"║  最晚睡觉: {lastweek_latest_night_time}\n"
+        f"╚═══════════"
+    )
+
+    await my_sleep.finish(msg, reply_message=True)

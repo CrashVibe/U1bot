@@ -234,3 +234,49 @@ async def get_all_morning_night_data(
         group_morning_count,
         group_night_count,
     )
+
+
+# 每周一新增显示上周睡眠信息统计，其他时间显示本周信息（我的作息 UID ）
+
+
+async def get_weekly_sleep_data(
+    uid: int,
+) -> (
+    tuple[
+        int,
+        int,
+        int,
+        datetime | str,
+        datetime | str,
+        int,
+        int,
+        int,
+        datetime | str,
+        datetime | str,
+    ]
+    | str
+):
+    """获取本周睡眠数据"""
+    target_user = await SleepUserModel.get_or_none(user_id=uid)
+    if not target_user:
+        return "没有找到你的睡眠数据呢.."
+    return (
+        target_user.weekly_sleep_time,
+        target_user.weekly_morning_cout,
+        target_user.weekly_night_cout,
+        target_user.weekly_earliest_morning_time
+        if target_user.weekly_earliest_morning_time
+        else "无",
+        target_user.weekly_latest_night_time
+        if target_user.weekly_latest_night_time
+        else "无",
+        target_user.lastweek_sleep_time,
+        target_user.lastweek_morning_cout,
+        target_user.lastweek_night_cout,
+        target_user.lastweek_earliest_morning_time
+        if target_user.lastweek_earliest_morning_time
+        else "无",
+        target_user.lastweek_latest_night_time
+        if target_user.lastweek_latest_night_time
+        else "无",
+    )

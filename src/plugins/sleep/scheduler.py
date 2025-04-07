@@ -1,5 +1,6 @@
 from nonebot.log import logger
 from nonebot_plugin_apscheduler import scheduler
+from tortoise.expressions import F
 
 from .config import settings
 from .models import SleepGroupModel, SleepUserModel
@@ -21,20 +22,18 @@ async def user_weekly_refresh() -> None:
     每周早晚安刷新, 重置每周早晚安
     """
 
-    # 本周数据转移到上周数据
     await SleepUserModel.all().update(
-        lastweek_morning_cout=SleepUserModel.weekly_morning_cout,
-        lastweek_sleep_time=SleepUserModel.weekly_sleep_time,
-        lastweek_night_cout=SleepUserModel.weekly_night_cout,
-        lastweek_earliest_morning_time=SleepUserModel.weekly_earliest_morning_time,
-        lastweek_latest_night_time=SleepUserModel.weekly_latest_night_time,
+        lastweek_morning_cout=F("weekly_morning_cout"),
+        lastweek_sleep_time=F("weekly_sleep_time"),
+        lastweek_night_cout=F("weekly_night_cout"),
+        lastweek_earliest_morning_time=F("weekly_earliest_morning_time"),
+        lastweek_latest_night_time=F("weekly_latest_night_time"),
         weekly_morning_cout=0,
         weekly_night_cout=0,
         weekly_sleep_time=0,
         weekly_earliest_morning_time=None,
         weekly_latest_night_time=None,
     )
-
     logger.info("每周早晚安已刷新！")
 
 
