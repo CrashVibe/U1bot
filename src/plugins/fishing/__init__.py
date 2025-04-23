@@ -1,7 +1,7 @@
 import asyncio
 import random
 
-from nonebot import get_driver, on_command
+from nonebot import get_driver, on_command, on_fullmatch
 from nonebot.adapters import Event, Message
 from nonebot.adapters.onebot.v11 import (
     Bot,
@@ -46,18 +46,17 @@ __plugin_meta__ = PluginMetadata(
 )
 
 Bot_NICKNAME: str = next(iter(get_driver().config.nickname), "姚奕")
-fishing = on_command("fishing", aliases={"钓鱼"}, block=True)
-stats = on_command("stats", aliases={"统计信息"}, block=True)
-backpack = on_command("backpack", aliases={"背包"}, block=True)
+fishing = on_fullmatch(("fishing", "钓鱼"), block=True)
+stats = on_fullmatch(("stats", "统计信息"), block=True)
+backpack = on_fullmatch(("backpack", "背包"), block=True)
 sell = on_command("sell", aliases={"卖鱼"}, block=True)
-balance = on_command("balance", aliases={"余额"}, block=True)
-switch = on_command(
-    "fish_switch",
-    aliases={"开关钓鱼"},
+balance = on_fullmatch(("balance", "余额"), block=True)
+switch = on_fullmatch(
+    ("fish_switch", "开关钓鱼"),
     permission=GROUP_OWNER | GROUP_ADMIN | SUPERUSER,
     block=True,
 )
-update_def = on_command("update", permission=SUPERUSER, block=True)
+update_def = on_fullmatch("update", permission=SUPERUSER, block=True)
 
 
 @update_def.handle()
