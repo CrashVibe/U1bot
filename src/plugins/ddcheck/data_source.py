@@ -1,11 +1,11 @@
+import json
 import math
-import traceback
+from http.cookies import SimpleCookie
 from pathlib import Path
+from typing import Any
 
-import aiohttp
-import bilireq
+import httpx
 import jinja2
-import ujson as json
 from nonebot.log import logger
 from nonebot_plugin_apscheduler import scheduler
 from nonebot_plugin_htmlrender import html_to_pic
@@ -13,22 +13,31 @@ from nonebot_plugin_localstore import get_cache_dir
 
 from .config import ddcheck_config
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 "
+        "Safari/537.36 Edg/114.0.1823.67"
+    ),
+    "Referer": "https://www.bilibili.com/",
+}
+
+
 data_path = get_cache_dir("nonebot_plugin_ddcheck")
 vtb_list_path = data_path / "vtb_list.json"
 
 dir_path = Path(__file__).parent
 template_path = dir_path / "template"
 env = jinja2.Environment(
-    loader=jinja2.FileSystemLoader(template_path), enable_async=True, autoescape=True
+    loader=jinja2.FileSystemLoader(template_path), enable_async=True
 )
 
 raw_cookie = ddcheck_config.bilibili_cookie
+cookie = SimpleCookie()
+cookie.load(raw_cookie)
+cookies = {key: value.value for key, value in cookie.items()}
 
-header1 = {
-    "content-type": "text/plain; charset=utf-8",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.71 Safari/537.36 Core/1.94.186.400 QQBrowser/11.3.5195.400",
-    "cookie": raw_cookie,
-}
+homepage_cookies: dict[str, str] = {}
 
 
 async def update_vtb_list():
@@ -39,11 +48,11 @@ async def update_vtb_list():
         "https://hkapi.vtbs.moe/v1/short",
         "https://kr.vtbs.moe/v1/short",
     ]
-    async with aiohttp.ClientSession() as session:
+    async with httpx.AsyncClient() as client:
         for url in urls:
             try:
-                async with session.get(url=url) as response:
-                    result = json.loads(await response.text())
+                resp = await client.get(url, timeout=20)
+                result = resp.json()
                 if not result:
                     continue
                 for info in result:
@@ -54,6 +63,8 @@ async def update_vtb_list():
                     if info.get("mid", None) and info.get("uname", None):
                         vtb_list.append(info)
                 break
+            except httpx.TimeoutException:
+                logger.warning(f"Get {url} timeout")
             except Exception:
                 logger.exception(f"Error when getting {url}, ignore")
     dump_vtb_list(vtb_list)
@@ -72,8 +83,8 @@ def load_vtb_list() -> list[dict]:
         with vtb_list_path.open("r", encoding="utf-8") as f:
             try:
                 return json.load(f)
-            except Exception:
-                logger.warning("vtb 列表解析错误，将重新获取")
+            except json.decoder.JSONDecodeError:
+                logger.warning("vtb列表解析错误，将重新获取")
                 vtb_list_path.unlink()
     return []
 
@@ -96,30 +107,50 @@ async def get_vtb_list() -> list[dict]:
     return load_vtb_list()
 
 
+async def get_homepage_cookies(client: httpx.AsyncClient) -> dict[str, str]:
+    if not homepage_cookies:
+        headers = {"User-Agent": HEADERS["User-Agent"]}
+        resp = await client.get(
+            "https://data.bilibili.com/v/", headers=headers, follow_redirects=True
+        )
+        homepage_cookies.update(resp.cookies)
+    return homepage_cookies
+
+
 async def get_uid_by_name(name: str) -> int | None:
     url = "https://api.bilibili.com/x/web-interface/wbi/search/type"
     params = {"search_type": "bili_user", "keyword": name}
-    resp = await bilireq.utils.get(url, params=params, headers=header1)
-    for user in resp["result"]:
-        if user["uname"] == name:
-            return user["mid"]
+    async with httpx.AsyncClient(timeout=10) as client:
+        cookies.update(await get_homepage_cookies(client))
+        resp = await client.get(url, params=params, headers=HEADERS, cookies=cookies)
+        cookies.update(resp.cookies)
+        result = resp.json()
+        logger.info(f"get_uid_by_name: {result}")
+        for user in result["data"]["result"]:
+            if user["uname"] == name:
+                return user["mid"]
 
 
-async def get_medals(uid: int) -> list[dict]:
+async def get_medal_list(uid: int) -> list[dict]:
     url = "https://api.live.bilibili.com/xlive/web-ucenter/user/MedalWall"
     params = {"target_id": uid}
-    resp = await bilireq.utils.get(url, params=params, headers=header1)
-    return resp["list"]
+    async with httpx.AsyncClient(timeout=10) as client:
+        cookies.update(await get_homepage_cookies(client))
+        resp = await client.get(url, params=params, headers=HEADERS, cookies=cookies)
+        cookies.update(resp.cookies)
+        result = resp.json()
+        return result["data"]["list"]
 
 
 async def get_user_info(uid: int) -> dict:
     url = "https://account.bilibili.com/api/member/getCardByMid"
     params = {"mid": uid}
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url=url, params=params, headers=header1) as response:
-            result = json.loads(await response.text())
-
-    return result["card"]
+    async with httpx.AsyncClient(timeout=10) as client:
+        cookies.update(await get_homepage_cookies(client))
+        resp = await client.get(url, params=params, headers=HEADERS, cookies=cookies)
+        cookies.update(resp.cookies)
+        result = resp.json()
+        return result["card"]
 
 
 def format_color(color: int) -> str:
@@ -142,41 +173,14 @@ def format_vtb_info(info: dict, medal_dict: dict) -> dict:
     return {"name": name, "uid": uid, "medal": medal}
 
 
-async def get_reply(name: str) -> str | bytes:
-    if name.isdigit():
-        uid = int(name)
-    else:
-        try:
-            uid = await get_uid_by_name(name)
-            if not uid:
-                raise AssertionError
-        except Exception:
-            logger.warning(traceback.format_exc())
-            return "获取用户信息失败，请检查名称或使用 uid 查询"
-
-    try:
-        user_info = await get_user_info(uid)
-    except Exception:
-        logger.error(f"获取用户信息失败{traceback.format_exc()}")
-        return "获取用户信息失败，请检查名称或稍后再试"
-
+async def render_ddcheck_image(
+    user_info: dict[str, Any], vtb_list: list[dict], medal_list: list[dict]
+) -> bytes:
     attentions = user_info.get("attentions", [])
     follows_num = int(user_info["attention"])
-    if not attentions and follows_num:
-        return "获取用户关注列表失败，关注列表可能未公开"
-
-    vtb_list = await get_vtb_list()
-    if not vtb_list:
-        return "获取 vtb 列表失败，请稍后再试"
-
-    try:
-        medals = await get_medals(uid)
-    except Exception:
-        logger.warning(traceback.format_exc())
-        medals = []
-    medal_dict = {medal["target_name"]: medal for medal in medals}
 
     vtb_dict = {info["mid"]: info for info in vtb_list}
+    medal_dict = {medal["target_name"]: medal for medal in medal_list}
     vtbs = [info for uid, info in vtb_dict.items() if uid in attentions]
     vtbs = [format_vtb_info(info, medal_dict) for info in vtbs]
 
