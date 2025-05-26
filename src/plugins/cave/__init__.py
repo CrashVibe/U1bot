@@ -16,8 +16,8 @@ from nonebot.plugin import PluginMetadata
 from .models import cave_models
 from .tool import is_image_message
 
-Bot_NICKNAME = list(get_driver().config.nickname)
-Bot_NICKNAME = Bot_NICKNAME[0] if Bot_NICKNAME else "bot"
+nickname_list = list(get_driver().config.nickname)
+Bot_NICKNAME = nickname_list[0] if nickname_list else "bot"
 __plugin_meta__ = PluginMetadata(
     name="回声洞",
     description="看看别人的投稿，也可以自己投稿~",

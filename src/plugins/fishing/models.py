@@ -1,8 +1,10 @@
 from tortoise import fields
 from tortoise.models import Model
-from nonebot_plugin_tortoise_orm import add_model
+
+from U1.database import add_model
 
 add_model(__name__)
+
 
 class FishingRecord(Model):
     id = fields.IntField(pk=True)

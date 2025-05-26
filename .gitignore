@@ -139,16 +139,7 @@ dmypy.json
 .pytype/
 
 # End of https://www.toptal.com/developers/gitignore/api/python
-db/
-ncm.png
-music/
 run.sh
-fix.sh
-.env.dev
-src/plugins/nonebot_plugin_addFriend/num.json
-test.txt
-src/plugins/nonebot_plugin_addFriend/config.json
-src/plugins/nonebot_plugin_addFriend/requestor.json
+.env
 .vscode
-result.out
-core
+aerich_config.py

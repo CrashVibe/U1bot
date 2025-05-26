@@ -1,13 +1,5 @@
-[tool.poetry]
-name = "u1bot"
-version = "0.1.0"
-description = ""
-authors = ["wling-art <wlingzhenyu@163.com>"]
-readme = "README.md"
+
 [tool.nonebot]
-adapters = [
-    { name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11" },
-]
 plugins = [
     "nonebot_plugin_apscheduler",
     "nonebot_plugin_htmlrender",
@@ -17,40 +9,27 @@ plugins = [
 ]
 plugin_dirs = ["src/plugins"]
 builtin_plugins = []
-
+[[tool.nonebot.adapters]]
+name = "OneBot V11"
+module_name = "nonebot.adapters.onebot.v11"
 
 [tool.ruff]
 line-length = 88
 target-version = "py311"
 
 [tool.ruff.lint]
-select = [
-    "F",     # Pyflakes
-    "W",     # pycodestyle warnings
-    "E",     # pycodestyle errors
-    "UP",    # pyupgrade
-    "ASYNC", # flake8-async
-    "C4",    # flake8-comprehensions
-    "T10",   # flake8-debugger
-    "PYI",   # flake8-pyi
-    "PT",    # flake8-pytest-style
-    "Q",     # flake8-quotes
-    "RUF",   # Ruff-specific rules
-]
-ignore = [
-    "E402",   # module-import-not-at-top-of-file
-    "E501",   # line-too-long
-    "UP037",  # quoted-annotation
-    "RUF001", # ambiguous-unicode-character-string
-    "RUF002", # ambiguous-unicode-character-docstring
-    "RUF003", # ambiguous-unicode-character-comment
-]
+select = ["F", "W", "E", "UP", "ASYNC", "C4", "T10", "PYI", "PT", "Q", "RUF"]
+ignore = ["E402", "E501", "UP037", "RUF001", "RUF002", "RUF003"]
 
 [tool.pyright]
 typeCheckingMode = "basic"
 
+[tool.aerich]
+tortoise_orm = "aerich_config.TORTOISE_ORM"
+location = "./migrations"
+src_folder = "./."
+
 [project]
-authors = [{ name = "wling-art", email = "wlingzhenyu@163.com" }]
 requires-python = "<4.0,>=3.10"
 dependencies = [
     "nonebot2[fastapi,aiohttp,websockets]>=2.4.1",
@@ -74,6 +53,9 @@ dependencies = [
     "httpx==0.27.2",
     "tortoise-orm[accel,asyncmy]>=0.24.2",
     "openai>=1.76.0",
+    "aerich>=0.9.0",
+    "tomlkit>=0.13.2",
+    "nb-cli>=1.4.2",
 ]
 name = "u1bot"
 version = "0.1.0"

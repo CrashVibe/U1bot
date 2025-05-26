@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from nonebot_plugin_tortoise_orm import add_model
 from tortoise import Model, fields
 from tortoise.fields import Field
+
+from U1.database import add_model
 
 add_model(__name__)
 

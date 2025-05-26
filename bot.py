@@ -54,10 +54,21 @@ app = nonebot.get_asgi()
 driver = nonebot.get_driver()
 driver.register_adapter(ONEBOT_V11Adapter)
 
+@driver.on_startup
+async def connect_db():
+    from U1.database import connect
+
+    await connect()
+
+@driver.on_shutdown
+async def disconnect_db():
+    from U1.database import disconnect
+
+    await disconnect()
 
 nonebot.load_from_toml("pyproject.toml")
 from nonebot.message import event_preprocessor
-from U1.database import Channel
+from U1.model import Channel
 
 
 async def get_channel(group_id: str):
