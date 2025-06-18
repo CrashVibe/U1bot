@@ -1,63 +1,57 @@
-from tortoise import fields
-from tortoise.fields.base import Field
-from tortoise.models import Model
+from datetime import datetime
+from typing import Dict, List
 
-from U1.database import add_model
+from sqlalchemy import BigInteger, DateTime, JSON
+from sqlalchemy.orm import Mapped, mapped_column
 
-add_model(__name__)
+from U1.database import Model
 
 
 class BaseGroupModel(Model):
-    group_id = fields.BigIntField(pk=True)
-    created_at = fields.DatetimeField(auto_now_add=True)
+    __abstract__ = True
 
-    class Meta:
-        abstract = True
+    group_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class WaifuProtect(BaseGroupModel):
-    user_ids: Field[list[int]] = fields.JSONField(default=list)
+    __tablename__ = "waifu_protect"
 
-    class Meta:
-        table = "waifu_protect"
+    user_ids: Mapped[List[int]] = mapped_column(JSON, default=list)
 
 
 class WaifuCP(BaseGroupModel):
-    affect: Field[dict[str, int]] = fields.JSONField(default=dict)
+    __tablename__ = "waifu_cp"
 
-    class Meta:
-        table = "waifu_cp"
+    affect: Mapped[Dict[str, int]] = mapped_column(JSON, default=dict)
 
 
 class PWaifu(BaseGroupModel):
-    waifu_list: Field[list[int]] = fields.JSONField(default=[])
+    __tablename__ = "waifu"
 
-    class Meta:
-        table = "waifu"
+    waifu_list: Mapped[List[int]] = mapped_column(JSON, default=list)
 
 
 class WaifuLock(BaseGroupModel):
-    lock = fields.JSONField(default={})
+    __tablename__ = "waifu_lock"
 
-    class Meta:
-        table = "waifu_lock"
+    lock: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class YinpaRecord(Model):
-    user_id = fields.BigIntField(pk=True)
-    active_count = fields.IntField(default=0)
-    passive_count = fields.IntField(default=0)
-    updated_at = fields.DatetimeField(auto_now=True)
+    __abstract__ = True
 
-    class Meta:
-        abstract = True
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    active_count: Mapped[int] = mapped_column(default=0)
+    passive_count: Mapped[int] = mapped_column(default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
 
 class YinpaActive(YinpaRecord):
-    class Meta:
-        table = "yinpa_active"
+    __tablename__ = "yinpa_active"
 
 
 class YinpaPassive(YinpaRecord):
-    class Meta:
-        table = "yinpa_passive"
+    __tablename__ = "yinpa_passive"

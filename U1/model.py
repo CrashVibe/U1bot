@@ -1,20 +1,19 @@
-from tortoise import fields
-from tortoise.models import Model
+from datetime import datetime
 
-from U1.database import add_model
+from sqlalchemy import BigInteger, DateTime, String, Text, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
 
-add_model(__name__)
+from U1.database import Model
 
 
 class Channel(Model):
-    id = fields.CharField(max_length=255, pk=True)
-    platform = fields.CharField(max_length=255)
-    flag = fields.BigIntField(unsigned=True, default=0, null=True)
-    assignee = fields.CharField(max_length=255, null=True)
-    guildId = fields.CharField(max_length=255, null=True)
-    locales = fields.TextField(null=True, default=None)
-    permissions = fields.TextField(null=True, default=None)
-    createdAt = fields.DatetimeField(null=True, default=None)
+    __table_args__ = (UniqueConstraint("platform", "flag"),)
 
-    class Meta:
-        unique_together = ("platform", "flag")
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    platform: Mapped[str] = mapped_column(String(255))
+    flag: Mapped[int | None] = mapped_column(BigInteger, default=0, nullable=True)
+    assignee: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    guildId: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    locales: Mapped[str | None] = mapped_column(Text, nullable=True)
+    permissions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    createdAt: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
