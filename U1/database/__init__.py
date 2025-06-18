@@ -1,16 +1,14 @@
-from nonebot import get_driver, logger
-
-from ujson import dumps
+from nonebot import get_driver, get_plugin_config, logger
 from tortoise import Tortoise
+from ujson import dumps
+
 from .config import Config
 
-db_url = (Config()).tortoise_orm_db_url
-
-
 driver = get_driver()
+plugin_config: Config = get_plugin_config(Config)
 
-
-DATABASE = {
+db_url: str = plugin_config.tortoise_orm_db_url
+DATABASE: dict = {
     "connections": {"default": db_url},
     "apps": {
         "default": {
@@ -29,7 +27,7 @@ async def connect():
     # await Tortoise.init(db_url=DB_URL, modules={"models": moduls})
     DATABASE["apps"]["default"]["models"] = models
 
-    logger.debug("参数预览\n" + dumps(DATABASE, ensure_ascii=False, indent=4))
+    logger.info("参数预览\n" + dumps(DATABASE, ensure_ascii=False, indent=4))
 
     await Tortoise.init(DATABASE)
     await Tortoise.generate_schemas()
