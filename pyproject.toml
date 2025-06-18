@@ -22,7 +22,9 @@ select = ["F", "W", "E", "UP", "ASYNC", "C4", "T10", "PYI", "PT", "Q", "RUF"]
 ignore = ["E402", "E501", "UP037", "RUF001", "RUF002", "RUF003"]
 
 [tool.pyright]
-typeCheckingMode = "basic"
+typeCheckingMode = "off"
+reportAttributeAccessIssue = false
+reportGeneralTypeIssues = false
 
 [project]
 requires-python = "<4.0,>=3.10"

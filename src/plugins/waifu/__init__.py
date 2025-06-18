@@ -7,8 +7,7 @@ from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, Message
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_apscheduler import scheduler
-from tortoise.models import Model
-from tortoise.queryset import QuerySet
+from typing import Any
 
 from .card_pool import card_pool
 from .cp_list import cp_list
@@ -83,7 +82,7 @@ happy_end = [
 cd_bye = {}
 
 
-async def safe_delete(query: QuerySet, using_db=None):
+async def safe_delete(query: Any, using_db: Any | None = None) -> Any:
     return await query.delete()
 
 
@@ -104,7 +103,7 @@ async def mo_reset_record():
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    models_to_clean: list[type[Model]] = [
+    models_to_clean: list[type[Any]] = [
         WaifuCP,
         PWaifu,
         WaifuLock,

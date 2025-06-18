@@ -1,6 +1,8 @@
 from nonebot.log import logger
 from nonebot_plugin_apscheduler import scheduler
-from tortoise.expressions import F
+from sqlalchemy import delete as sa_delete, update as sa_update
+
+from U1.database import get_scoped_session
 
 from .config import settings
 from .models import SleepGroupModel, SleepUserModel
@@ -12,7 +14,9 @@ async def group_daily_refresh() -> None:
     """
 
     # 重置每日早晚安
-    await SleepGroupModel.all().delete()
+    session = get_scoped_session()
+    await session.execute(sa_delete(SleepGroupModel))
+    await session.commit()
 
     logger.info("每日早晚安已刷新！")
 
@@ -22,18 +26,23 @@ async def user_weekly_refresh() -> None:
     每周早晚安刷新, 重置每周早晚安
     """
 
-    await SleepUserModel.all().update(
-        lastweek_morning_cout=F("weekly_morning_cout"),
-        lastweek_sleep_time=F("weekly_sleep_time"),
-        lastweek_night_cout=F("weekly_night_cout"),
-        lastweek_earliest_morning_time=F("weekly_earliest_morning_time"),
-        lastweek_latest_night_time=F("weekly_latest_night_time"),
-        weekly_morning_cout=0,
-        weekly_night_cout=0,
-        weekly_sleep_time=0,
-        weekly_earliest_morning_time=None,
-        weekly_latest_night_time=None,
+    session = get_scoped_session()
+    await session.execute(
+        sa_update(SleepUserModel)
+        .values(
+            lastweek_morning_cout=SleepUserModel.weekly_morning_cout,
+            lastweek_sleep_time=SleepUserModel.weekly_sleep_time,
+            lastweek_night_cout=SleepUserModel.weekly_night_cout,
+            lastweek_earliest_morning_time=SleepUserModel.weekly_earliest_morning_time,
+            lastweek_latest_night_time=SleepUserModel.weekly_latest_night_time,
+            weekly_morning_cout=0,
+            weekly_night_cout=0,
+            weekly_sleep_time=0,
+            weekly_earliest_morning_time=None,
+            weekly_latest_night_time=None,
+        )
     )
+    await session.commit()
     logger.info("每周早晚安已刷新！")
 
 

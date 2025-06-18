@@ -4,7 +4,9 @@ import time
 from cachetools import TTLCache
 from nonebot import on_command
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
-from tortoise.expressions import F
+from sqlalchemy import update as sa_update
+
+from U1.database import get_scoped_session
 
 from .config import settings
 from .models import YinpaActive, YinpaPassive
@@ -48,10 +50,18 @@ async def handle_yinpa(bot: Bot, event: GroupMessageEvent):
     success = await process_yinpa()
 
     # 保存记录
-    await YinpaActive.filter(user_id=user_id).update(active_count=F("active_count") + 1)
-    await YinpaPassive.filter(user_id=target).update(
-        passive_count=F("passive_count") + 1
+    session = get_scoped_session()
+    await session.execute(
+        sa_update(YinpaActive)
+        .where(YinpaActive.user_id == user_id)
+        .values(active_count=YinpaActive.active_count + 1)
     )
+    await session.execute(
+        sa_update(YinpaPassive)
+        .where(YinpaPassive.user_id == target)
+        .values(passive_count=YinpaPassive.passive_count + 1)
+    )
+    await session.commit()
 
     # 生成结果消息
     msg = generate_yinpa_result(success, target)
