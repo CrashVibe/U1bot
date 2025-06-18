@@ -15,6 +15,7 @@ from nonebot.plugin import PluginMetadata
 from nonebot_plugin_orm import get_session
 from sqlalchemy import delete, select
 
+from ..coin.api import subtract_coin
 from .models import cave_models
 from .tool import is_image_message
 
@@ -23,7 +24,8 @@ Bot_NICKNAME = nickname_list[0] if nickname_list else "bot"
 __plugin_meta__ = PluginMetadata(
     name="回声洞",
     description="看看别人的投稿，也可以自己投稿~",
-    usage="""投稿\n
+    usage="""投稿 (消耗200次元币)\n
+匿名投稿 (消耗200次元币)\n
 查看回声洞记录\n
 删除 [序号]\n
 如：\n
@@ -135,6 +137,14 @@ async def _(bot: Bot, event: MessageEvent):
     if result[0] is False:  # 审核
         await cave_add.finish(result[1])
 
+    # 扣除次元币
+    user_id = str(event.user_id)
+    success, remaining_coin = await subtract_coin(user_id, 200)
+    if not success:
+        await cave_add.finish(
+            f"投稿需要消耗 200 次元币，您当前只有 {remaining_coin:.1f} 次元币，余额不足！"
+        )
+
     async with get_session() as session:
         caves = cave_models(details=details, user_id=event.user_id)
         session.add(caves)
@@ -146,7 +156,8 @@ async def _(bot: Bot, event: MessageEvent):
         result += f"内容：\n{caves.details}\n"
         result += "----------------------\n"
         result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "----------------------"
+        result += "----------------------\n"
+        result += f"消耗了 200 次元币，剩余 {remaining_coin:.1f} 次元币"
         for i in SUPERUSER_list:
             await bot.send_private_msg(
                 user_id=int(i),
@@ -163,7 +174,15 @@ async def _(bot: Bot, event: MessageEvent):
     details = details.replace("匿名投稿", "", 1).strip()
     result = await condition(event, details)
     if result[0] is False:  # 审核
-        await cave_add.finish(result[1])
+        await cave_am_add.finish(result[1])
+
+    # 扣除次元币
+    user_id = str(event.user_id)
+    success, remaining_coin = await subtract_coin(user_id, 400)
+    if not success:
+        await cave_am_add.finish(
+            f"匿名投稿需要消耗 400 次元币，您当前只有 {remaining_coin:.1f} 次元币，余额不足！"
+        )
 
     async with get_session() as session:
         caves = cave_models(details=details, user_id=event.user_id, anonymous=True)
@@ -177,13 +196,14 @@ async def _(bot: Bot, event: MessageEvent):
         result += "----------------------\n"
         result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         result += "----------------------\n"
-        result += "匿名投稿将会保存用户信息\n但其他用户无法看到作者"
+        result += "匿名投稿将会保存用户信息\n但其他用户无法看到作者\n"
+        result += f"消耗了 400 次元币，剩余 {remaining_coin:.1f} 次元币"
         for i in SUPERUSER_list:
             await bot.send_private_msg(
                 user_id=int(i),
                 message=Message(f"来自用户{event.get_user_id()}\n{result}"),
             )
-        await cave_add.finish(Message(f"匿名投稿成功！\n{result}"))
+        await cave_am_add.finish(Message(f"匿名投稿成功！\n{result}"))
 
 
 @cave_del.handle()
