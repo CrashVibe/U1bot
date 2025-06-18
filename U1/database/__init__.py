@@ -103,7 +103,7 @@ async def connect() -> None:
 async def disconnect() -> None:
     """Close scoped session."""
     try:
-        get_scoped_session().remove()
+        get_scoped_session().remove()  # pyright: ignore[reportUnusedCoroutine]
     except Exception:
         pass
 

@@ -55,6 +55,7 @@ async def get_current_ev_receipt(msg_ids: Any):
         context=ev,
         exporter=exporter,
         msg_ids=msg_ids if isinstance(msg_ids, list) else [msg_ids],
+        uni_factory=UniMessage,
     )
 
 

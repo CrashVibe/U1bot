@@ -31,7 +31,8 @@ async def process_status() -> List[ProcessStatus]:
         # await asyncio.sleep(1)
         with proc.oneshot():
             cpu = proc.cpu_percent()
-            cpu = cpu / psutil.cpu_count() if config.ps_proc_cpu_max_100p else cpu
+            count = psutil.cpu_count() or 1
+            cpu = cpu / count if config.ps_proc_cpu_max_100p else cpu
             mem: int = proc.memory_info().rss
 
         return ProcessStatus(name=name, cpu=cpu, mem=mem)

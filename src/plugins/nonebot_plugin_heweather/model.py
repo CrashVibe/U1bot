@@ -1,7 +1,8 @@
 from enum import IntEnum
 
-from nonebot.compat import PYDANTIC_V2, ConfigDict
+from nonebot.compat import PYDANTIC_V2
 from pydantic import BaseModel
+from pydantic.config import ConfigDict
 
 
 class Now(BaseModel):

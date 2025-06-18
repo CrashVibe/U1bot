@@ -59,7 +59,7 @@ async def _():
     await cave_update.send(f"共有{len(all_caves)}条记录，{len(new_caves)}条不重复记录")
 
     # 保存新的对象
-    await cave_models.all().delete()
+    await cave_models.filter().delete()
     for index, cave in enumerate(new_caves, start=1):
         await cave_models.create(
             id=index, details=cave.details, user_id=cave.user_id, time=cave.time
@@ -75,7 +75,7 @@ async def _():
         new_cave.append((details, user_id, time, anonymous))
     # 按照time排序
     new_cave = sorted(new_cave, key=lambda x: x[2], reverse=False)
-    await cave_models.all().delete()
+    await cave_models.filter().delete()
 
     for index, (details, user_id, time, anonymous) in enumerate(new_cave, start=1):
         await cave_models.create(

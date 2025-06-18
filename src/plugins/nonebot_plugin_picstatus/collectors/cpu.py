@@ -34,12 +34,14 @@ async def cpu_brand() -> str:
 
 @first_time_collector()
 async def cpu_count_logical() -> int:
-    return psutil.cpu_count()
+    count = psutil.cpu_count()
+    return count if count is not None else 0
 
 
 @first_time_collector()
 async def cpu_count() -> int:
-    return psutil.cpu_count(logical=False)
+    count = psutil.cpu_count(logical=False)
+    return count if count is not None else 0
 
 
 @periodic_collector()
