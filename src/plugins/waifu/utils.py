@@ -92,5 +92,14 @@ def get_bi_mapping_contains(data: dict, input_value: int) -> bool:
 
 
 async def get_protected_users(group_id: int) -> list[int]:
-    protect = await WaifuProtect.get_or_none(group_id=group_id)
-    return protect.user_ids if protect else []
+    from nonebot import require
+
+    require("nonebot_plugin_orm")
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import select
+
+    async with get_session() as session:
+        stmt = select(WaifuProtect).where(WaifuProtect.group_id == group_id)
+        result = await session.execute(stmt)
+        protect = result.scalar_one_or_none()
+        return protect.user_ids if protect else []

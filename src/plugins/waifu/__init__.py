@@ -2,13 +2,15 @@ import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from nonebot import get_driver, logger, on_command
+from nonebot import get_driver, logger, on_command, require
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, MessageSegment
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_apscheduler import scheduler
-from tortoise.models import Model
-from tortoise.queryset import QuerySet
+
+require("nonebot_plugin_orm")
+from nonebot_plugin_orm import async_scoped_session
+from sqlalchemy import select
 
 from .card_pool import card_pool
 from .cp_list import cp_list
@@ -83,19 +85,20 @@ happy_end = [
 cd_bye = {}
 
 
-async def safe_delete(query: QuerySet, using_db=None):
-    return await query.delete()
-
-
 async def reset_record():
     logger.info("定时重置娶群友记录")
     yesterday = datetime.now(ZoneInfo("Asia/Shanghai")).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    models_to_clean = [WaifuCP, PWaifu, WaifuLock]
-    for model in models_to_clean:
-        await safe_delete(model.filter(created_at=yesterday))
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import delete
+
+    async with get_session() as session:
+        for model in [WaifuCP, PWaifu, WaifuLock]:
+            stmt = delete(model).where(model.created_at == yesterday)
+            await session.execute(stmt)
+        await session.commit()
 
 
 async def mo_reset_record():
@@ -104,16 +107,45 @@ async def mo_reset_record():
         hour=0, minute=0, second=0, microsecond=0
     )
 
-    models_to_clean: list[type[Model]] = [
-        WaifuCP,
-        PWaifu,
-        WaifuLock,
-    ]
-    for model in models_to_clean:
-        await safe_delete(model.filter(created_at=yesterday))
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import delete
+
+    async with get_session() as session:
+        for model in [WaifuCP, PWaifu, WaifuLock]:
+            stmt = delete(model).where(model.created_at == yesterday)
+            await session.execute(stmt)
+        await session.commit()
 
 
-on_command("重置记录", permission=SUPERUSER, block=True).append_handler(mo_reset_record)
+async def get_or_create_cp_record(session, group_id: int):
+    """获取或创建 CP 记录"""
+    stmt = select(WaifuCP).where(WaifuCP.group_id == group_id)
+    result = await session.execute(stmt)
+    record = result.scalar_one_or_none()
+
+    if record is None:
+        record = WaifuCP(group_id=group_id)
+        session.add(record)
+        await session.commit()
+        await session.refresh(record)
+
+    return record
+
+
+async def get_or_create_waifu_record(session, group_id: int):
+    """获取或创建群友记录"""
+    stmt = select(PWaifu).where(PWaifu.group_id == group_id)
+    result = await session.execute(stmt)
+    record = result.scalar_one_or_none()
+
+    if record is None:
+        record = PWaifu(group_id=group_id)
+        session.add(record)
+        await session.commit()
+        await session.refresh(record)
+
+    return record
+
 
 scheduler.add_job(reset_record, "cron", hour=0, minute=0, misfire_grace_time=120)
 
@@ -128,21 +160,24 @@ async def handle_waifu(bot: Bot, event: GroupMessageEvent):
     group_id = event.group_id
     user_id = event.user_id
 
-    # 获取 CP 记录
-    cp_record, _ = await WaifuCP.get_or_create(group_id=group_id)
+    from nonebot_plugin_orm import get_session
 
-    # 检查已有 CP
-    if existing_cp := get_bi_mapping(cp_record.affect, user_id):
-        return await handle_existing_cp(bot, event, existing_cp)
+    async with get_session() as session:
+        # 获取 CP 记录
+        cp_record = await get_or_create_cp_record(session, group_id)
 
-    # 选择逻辑
-    selected = await select_waifu(bot, event, cp_record)
-    if not selected:
-        return await waifu.finish(random.choice(no_waifu), at_sender=True)
+        # 检查已有 CP
+        if existing_cp := get_bi_mapping(cp_record.affect, user_id):
+            return await handle_existing_cp(bot, event, existing_cp)
 
-    # 保存记录
-    await update_records(group_id, user_id, selected)
-    await send_result(bot, event, selected)
+        # 选择逻辑
+        selected = await select_waifu(bot, event, cp_record)
+        if not selected:
+            return await waifu.finish(random.choice(no_waifu), at_sender=True)
+
+        # 保存记录
+        await update_records(session, group_id, user_id, selected)
+        await send_result(bot, event, selected)
 
 
 async def select_waifu(
@@ -196,15 +231,17 @@ async def handle_existing_cp(bot: Bot, event: GroupMessageEvent, existing_cp: in
     await bot.send(event, Message(msg), at_sender=True)
 
 
-async def update_records(group_id: int, user_id: int, selected: int):
-    record_cp, _ = await WaifuCP.get_or_create(group_id=group_id)
+async def update_records(session, group_id: int, user_id: int, selected: int):
+    record_cp = await get_or_create_cp_record(session, group_id)
 
     record_cp.affect[str(user_id)] = selected
-    await record_cp.save()
+    session.add(record_cp)
 
-    record_waifu, _ = await PWaifu.get_or_create(group_id=group_id)
+    record_waifu = await get_or_create_waifu_record(session, group_id)
     record_waifu.waifu_list.append(selected)
-    await record_waifu.save()
+    session.add(record_waifu)
+
+    await session.commit()
 
 
 async def send_result(bot: Bot, event: GroupMessageEvent, selected: int):
@@ -267,6 +304,8 @@ async def clean_cd_cache():
 
 
 from nonebot_plugin_apscheduler import scheduler
+
+on_command("重置记录", permission=SUPERUSER, block=True).append_handler(mo_reset_record)
 
 
 def setup_scheduler():

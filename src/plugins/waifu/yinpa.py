@@ -2,9 +2,12 @@ import random
 import time
 
 from cachetools import TTLCache
-from nonebot import on_command
+from nonebot import on_command, require
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
-from tortoise.expressions import F
+
+require("nonebot_plugin_orm")
+from nonebot_plugin_orm import get_session
+from sqlalchemy import select
 
 from .config import settings
 from .models import YinpaActive, YinpaPassive
@@ -48,10 +51,30 @@ async def handle_yinpa(bot: Bot, event: GroupMessageEvent):
     success = await process_yinpa()
 
     # 保存记录
-    await YinpaActive.filter(user_id=user_id).update(active_count=F("active_count") + 1)
-    await YinpaPassive.filter(user_id=target).update(
-        passive_count=F("passive_count") + 1
-    )
+    async with get_session() as session:
+        # 更新主动记录
+        active_stmt = select(YinpaActive).where(YinpaActive.user_id == user_id)
+        active_result = await session.execute(active_stmt)
+        active_record = active_result.scalar_one_or_none()
+
+        if active_record is None:
+            active_record = YinpaActive(user_id=user_id, active_count=1)
+            session.add(active_record)
+        else:
+            active_record.active_count += 1
+
+        # 更新被动记录
+        passive_stmt = select(YinpaPassive).where(YinpaPassive.user_id == target)
+        passive_result = await session.execute(passive_stmt)
+        passive_record = passive_result.scalar_one_or_none()
+
+        if passive_record is None:
+            passive_record = YinpaPassive(user_id=target, passive_count=1)
+            session.add(passive_record)
+        else:
+            passive_record.passive_count += 1
+
+        await session.commit()
 
     # 生成结果消息
     msg = generate_yinpa_result(success, target)

@@ -33,34 +33,49 @@ async def luck(bot: Bot, event: MessageEvent):
 
 
 async def luck_result(user_id, focus: bool = False) -> str:
-    # 读取数据库
-    member_model = await MemberData.get_or_none(user_id=user_id)
+    from nonebot import require
 
-    if member_model is None:
-        # 如果没有数据则创建数据
-        result, luckid = random_luck()
-        await MemberData.create(
-            user_id=user_id, luckid=luckid, time=datetime.now(ZoneInfo("Asia/Shanghai"))
-        )
-    elif (
-        member_model.time.strftime("%Y-%m-%d") == time.strftime("%Y-%m-%d")
-        and not focus
-    ):
-        # 如果是今天的数据则返回今天的数据
-        logger.info(f"member_model.luckid1: {member_model.luckid}")
-        r = str(member_model.luckid)
-        result = (
-            f"----\n{luckdata[r]['运势']}\n{luckdata[r]['星级']}\n"
-            f"{luckdata[r]['签文']}\n{luckdata[r]['解签']}\n----"
-        )
-    else:
-        # 如果不是今天的数据则随机运势
-        result, luckid = random_luck()
-        logger.info(f"member_model.luckid2: {member_model.luckid}")
-        member_model.luckid = luckid
-        member_model.time = datetime.now(ZoneInfo("Asia/Shanghai"))
-        await member_model.save()
-    return result
+    require("nonebot_plugin_orm")
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import select
+
+    async with get_session() as session:
+        # 读取数据库
+        stmt = select(MemberData).where(MemberData.user_id == user_id)
+        result = await session.execute(stmt)
+        member_model = result.scalar_one_or_none()
+
+        if member_model is None:
+            # 如果没有数据则创建数据
+            luck_result, luckid = random_luck()
+            member_model = MemberData(
+                user_id=user_id,
+                luckid=luckid,
+                time=datetime.now(ZoneInfo("Asia/Shanghai")),
+            )
+            session.add(member_model)
+            await session.commit()
+            return luck_result
+        elif (
+            member_model.time.strftime("%Y-%m-%d") == time.strftime("%Y-%m-%d")
+            and not focus
+        ):
+            # 如果是今天的数据则返回今天的数据
+            logger.info(f"member_model.luckid1: {member_model.luckid}")
+            r = str(member_model.luckid)
+            result = (
+                f"----\n{luckdata[r]['运势']}\n{luckdata[r]['星级']}\n"
+                f"{luckdata[r]['签文']}\n{luckdata[r]['解签']}\n----"
+            )
+        else:
+            # 如果不是今天的数据则随机运势
+            result, luckid = random_luck()
+            logger.info(f"member_model.luckid2: {member_model.luckid}")
+            member_model.luckid = luckid
+            member_model.time = datetime.now(ZoneInfo("Asia/Shanghai"))
+            session.add(member_model)
+            await session.commit()
+        return result
 
 
 def random_luck():

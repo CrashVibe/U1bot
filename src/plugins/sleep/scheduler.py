@@ -1,6 +1,8 @@
+from nonebot import require
 from nonebot.log import logger
 from nonebot_plugin_apscheduler import scheduler
-from tortoise.expressions import F
+
+require("nonebot_plugin_orm")
 
 from .config import settings
 from .models import SleepGroupModel, SleepUserModel
@@ -10,9 +12,14 @@ async def group_daily_refresh() -> None:
     """
     每日早晚安刷新
     """
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import delete
 
-    # 重置每日早晚安
-    await SleepGroupModel.all().delete()
+    async with get_session() as session:
+        # 重置每日早晚安
+        stmt = delete(SleepGroupModel)
+        await session.execute(stmt)
+        await session.commit()
 
     logger.info("每日早晚安已刷新！")
 
@@ -21,19 +28,31 @@ async def user_weekly_refresh() -> None:
     """
     每周早晚安刷新, 重置每周早晚安
     """
+    from nonebot_plugin_orm import get_session
+    from sqlalchemy import select
 
-    await SleepUserModel.all().update(
-        lastweek_morning_cout=F("weekly_morning_cout"),
-        lastweek_sleep_time=F("weekly_sleep_time"),
-        lastweek_night_cout=F("weekly_night_cout"),
-        lastweek_earliest_morning_time=F("weekly_earliest_morning_time"),
-        lastweek_latest_night_time=F("weekly_latest_night_time"),
-        weekly_morning_cout=0,
-        weekly_night_cout=0,
-        weekly_sleep_time=0,
-        weekly_earliest_morning_time=None,
-        weekly_latest_night_time=None,
-    )
+    async with get_session() as session:
+        # 先查询所有用户记录
+        stmt = select(SleepUserModel)
+        result = await session.execute(stmt)
+        users = result.scalars().all()
+
+        # 更新每个用户的记录
+        for user in users:
+            user.lastweek_morning_cout = user.weekly_morning_cout
+            user.lastweek_sleep_time = user.weekly_sleep_time
+            user.lastweek_night_cout = user.weekly_night_cout
+            user.lastweek_earliest_morning_time = user.weekly_earliest_morning_time
+            user.lastweek_latest_night_time = user.weekly_latest_night_time
+            user.weekly_morning_cout = 0
+            user.weekly_night_cout = 0
+            user.weekly_sleep_time = 0
+            user.weekly_earliest_morning_time = None
+            user.weekly_latest_night_time = None
+            session.add(user)
+
+        await session.commit()
+
     logger.info("每周早晚安已刷新！")
 
 

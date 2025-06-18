@@ -12,6 +12,8 @@ from nonebot.adapters.onebot.v11.helpers import extract_image_urls
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata
+from nonebot_plugin_orm import get_session
+from sqlalchemy import delete, select
 
 from .models import cave_models
 from .tool import is_image_message
@@ -43,44 +45,69 @@ SUPERUSER_list = list(get_driver().config.superusers)
 @cave_update.handle()
 async def _():
     "操作数据库，将id重新排列，并且自动id更新到最新"
-    all_caves = await cave_models.all()
+    async with get_session() as session:
+        # 获取所有记录
+        stmt = select(cave_models)
+        result = await session.execute(stmt)
+        all_caves = result.scalars().all()
 
-    # 使用集合来跟踪已处理的详情
-    seen_details = set()
-    new_caves = []
+        # 使用集合来跟踪已处理的详情
+        seen_details = set()
+        new_caves = []
 
-    # 遍历所有对象，移除重复项
-    for cave in all_caves:
-        if cave.details not in seen_details:
-            seen_details.add(cave.details)
-            new_caves.append(cave)
+        # 遍历所有对象，移除重复项
+        for cave in all_caves:
+            if cave.details not in seen_details:
+                seen_details.add(cave.details)
+                new_caves.append(cave)
 
-    # 提示信息
-    await cave_update.send(f"共有{len(all_caves)}条记录，{len(new_caves)}条不重复记录")
-
-    # 保存新的对象
-    await cave_models.all().delete()
-    for index, cave in enumerate(new_caves, start=1):
-        await cave_models.create(
-            id=index, details=cave.details, user_id=cave.user_id, time=cave.time
+        # 提示信息
+        await cave_update.send(
+            f"共有{len(all_caves)}条记录，{len(new_caves)}条不重复记录"
         )
-    all_caves = await cave_models.all()
-    new_cave = []
-    # 重新排列并创建新的对象
-    for cave in all_caves:
-        details = cave.details
-        user_id = cave.user_id
-        time = cave.time
-        anonymous = cave.anonymous
-        new_cave.append((details, user_id, time, anonymous))
-    # 按照time排序
-    new_cave = sorted(new_cave, key=lambda x: x[2], reverse=False)
-    await cave_models.all().delete()
 
-    for index, (details, user_id, time, anonymous) in enumerate(new_cave, start=1):
-        await cave_models.create(
-            id=index, details=details, user_id=user_id, time=time, anonymous=anonymous
-        )
+        # 删除所有记录
+        await session.execute(delete(cave_models))
+
+        # 保存新的对象
+        for index, cave in enumerate(new_caves, start=1):
+            new_cave = cave_models(
+                id=index, details=cave.details, user_id=cave.user_id, time=cave.time
+            )
+            session.add(new_cave)
+        await session.commit()
+
+        # 重新获取所有记录
+        stmt = select(cave_models)
+        result = await session.execute(stmt)
+        all_caves = result.scalars().all()
+
+        new_cave = []
+        # 重新排列并创建新的对象
+        for cave in all_caves:
+            details = cave.details
+            user_id = cave.user_id
+            time = cave.time
+            anonymous = cave.anonymous
+            new_cave.append((details, user_id, time, anonymous))
+
+        # 按照time排序
+        new_cave = sorted(new_cave, key=lambda x: x[2], reverse=False)
+
+        # 删除所有记录
+        await session.execute(delete(cave_models))
+
+        # 重新创建排序后的记录
+        for index, (details, user_id, time, anonymous) in enumerate(new_cave, start=1):
+            sorted_cave = cave_models(
+                id=index,
+                details=details,
+                user_id=user_id,
+                time=time,
+                anonymous=anonymous,
+            )
+            session.add(sorted_cave)
+        await session.commit()
 
     await cave_update.finish("更新成功！")
 
@@ -107,19 +134,25 @@ async def _(bot: Bot, event: MessageEvent):
     result = await condition(event, details)
     if result[0] is False:  # 审核
         await cave_add.finish(result[1])
-    caves = await cave_models.create(details=details, user_id=event.user_id)
-    result = f"预览：\n编号:{caves.id}\n"
-    result += "----------------------\n"
-    result += f"内容：\n{caves.details}\n"
-    result += "----------------------\n"
-    result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-    result += "----------------------"
-    for i in SUPERUSER_list:
-        await bot.send_private_msg(
-            user_id=int(i),
-            message=Message(f"来自用户{event.get_user_id()}\n{result}"),
-        )
-    await cave_add.finish(Message(f"投稿成功！\n{result}"))
+
+    async with get_session() as session:
+        caves = cave_models(details=details, user_id=event.user_id)
+        session.add(caves)
+        await session.commit()
+        await session.refresh(caves)
+
+        result = f"预览：\n编号:{caves.id}\n"
+        result += "----------------------\n"
+        result += f"内容：\n{caves.details}\n"
+        result += "----------------------\n"
+        result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "----------------------"
+        for i in SUPERUSER_list:
+            await bot.send_private_msg(
+                user_id=int(i),
+                message=Message(f"来自用户{event.get_user_id()}\n{result}"),
+            )
+        await cave_add.finish(Message(f"投稿成功！\n{result}"))
 
 
 @cave_am_add.handle()
@@ -131,22 +164,26 @@ async def _(bot: Bot, event: MessageEvent):
     result = await condition(event, details)
     if result[0] is False:  # 审核
         await cave_add.finish(result[1])
-    caves = await cave_models.create(
-        details=details, user_id=event.user_id, anonymous=True
-    )
-    result = f"预览：\n编号:{caves.id}\n"
-    result += "----------------------\n"
-    result += f"内容：\n{caves.details}\n"
-    result += "----------------------\n"
-    result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-    result += "----------------------\n"
-    result += "匿名投稿将会保存用户信息\n但其他用户无法看到作者"
-    for i in SUPERUSER_list:
-        await bot.send_private_msg(
-            user_id=int(i),
-            message=Message(f"来自用户{event.get_user_id()}\n{result}"),
-        )
-    await cave_add.finish(Message(f"匿名投稿成功！\n{result}"))
+
+    async with get_session() as session:
+        caves = cave_models(details=details, user_id=event.user_id, anonymous=True)
+        session.add(caves)
+        await session.commit()
+        await session.refresh(caves)
+
+        result = f"预览：\n编号:{caves.id}\n"
+        result += "----------------------\n"
+        result += f"内容：\n{caves.details}\n"
+        result += "----------------------\n"
+        result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "----------------------\n"
+        result += "匿名投稿将会保存用户信息\n但其他用户无法看到作者"
+        for i in SUPERUSER_list:
+            await bot.send_private_msg(
+                user_id=int(i),
+                message=Message(f"来自用户{event.get_user_id()}\n{result}"),
+            )
+        await cave_add.finish(Message(f"匿名投稿成功！\n{result}"))
 
 
 @cave_del.handle()
@@ -160,54 +197,74 @@ async def _(bot: Bot, event: MessageEvent):
         key = int(key)
     except ValueError:
         await cave_del.finish("请输入正确的序号")
-    try:
-        data = await cave_models.get(id=key)
-    except Exception:
-        await cave_del.finish("没有这个序号的投稿")
-    # 判断是否是超级用户或者是投稿人
-    if str(event.user_id) in SUPERUSER_list:
+
+    async with get_session() as session:
         try:
-            await bot.send_private_msg(
-                user_id=data.user_id,
-                message=Message(
-                    f"你的投稿{key}已经被{event.user_id}删除了！\n内容为：\n{data.details}\n原因：{reason}"
-                ),
-            )
+            stmt = select(cave_models).where(cave_models.id == key)
+            result = await session.execute(stmt)
+            data = result.scalar_one()
         except Exception:
-            logger.exception(f"回声洞删除投稿私聊通知失败，投稿人 id：{data.user_id}")
-            await cave_del.send("删除失败，私聊通知失败")
-    elif event.user_id == data.user_id:
-        await data.delete()
-        await data.save()
+            await cave_del.finish("没有这个序号的投稿")
+
+        # 判断是否是超级用户或者是投稿人
+        if str(event.user_id) in SUPERUSER_list:
+            try:
+                await bot.send_private_msg(
+                    user_id=data.user_id,
+                    message=Message(
+                        f"你的投稿{key}已经被{event.user_id}删除了！\n内容为：\n{data.details}\n原因：{reason}"
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    f"回声洞删除投稿私聊通知失败，投稿人 id：{data.user_id}"
+                )
+                await cave_del.send("删除失败，私聊通知失败")
+        elif event.user_id == data.user_id:
+            result_content = data.details
+            await session.delete(data)
+            await session.commit()
+            await cave_del.finish(
+                Message(
+                    f"删除成功！编号{key}的投稿已经被删除！\n内容为：\n{result_content}"
+                )
+            )
+        else:
+            await cave_del.finish("你不是投稿人，也不是作者的，你想干咩？")
+
+        result_content = data.details
+        await session.delete(data)
+        await session.commit()
         await cave_del.finish(
-            Message(f"删除成功！编号{key}的投稿已经被删除！\n内容为：\n{data.details}")
+            Message(
+                f"删除成功！编号{key}的投稿已经被删除！\n内容为：\n{result_content}\n原因：{reason}"
+            )
         )
-    else:
-        await cave_del.finish("你不是投稿人，也不是作者的，你想干咩？")
-    result = data.details
-    await data.delete()
-    await data.save()
-    await cave_del.finish(
-        Message(
-            f"删除成功！编号{key}的投稿已经被删除！\n内容为：\n{result}\n原因：{reason}"
-        )
-    )
 
 
 @cave_main.handle()
 async def _():
-    all_caves = await cave_models.all()
-    random_cave = random.choice(all_caves)
-    displayname = "***（匿名投稿）" if random_cave.anonymous else random_cave.user_id
-    result = f"编号:{random_cave.id}\n"
-    result += "----------------------\n"
-    result += f"内容：\n{random_cave.details}\n"
-    result += "----------------------\n"
-    result += f"投稿人：{displayname}\n"
-    result += f"投稿时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-    result += "----------------------\n"
-    result += "可以私聊我投稿内容啊！\n投稿 [内容]（支持图片，文字）\n匿名投稿 [内容]（支持图片，文字）"
-    await cave_main.finish(Message(result))
+    async with get_session() as session:
+        stmt = select(cave_models)
+        result = await session.execute(stmt)
+        all_caves = result.scalars().all()
+
+        if not all_caves:
+            await cave_main.finish("暂时没有投稿哦~")
+
+        random_cave = random.choice(all_caves)
+        displayname = (
+            "***（匿名投稿）" if random_cave.anonymous else random_cave.user_id
+        )
+        result = f"编号:{random_cave.id}\n"
+        result += "----------------------\n"
+        result += f"内容：\n{random_cave.details}\n"
+        result += "----------------------\n"
+        result += f"投稿人：{displayname}\n"
+        result += f"投稿时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "----------------------\n"
+        result += "可以私聊我投稿内容啊！\n投稿 [内容]（支持图片，文字）\n匿名投稿 [内容]（支持图片，文字）"
+        await cave_main.finish(Message(result))
 
 
 @cave_view.handle()
@@ -215,37 +272,46 @@ async def _(args: Message = CommandArg()):
     key = str(args).strip()
     if not key:
         await cave_view.finish("请输入编号")
-    cave = await cave_models.get_or_none(id=int(key))
-    if cave is None:
-        await cave_view.finish("没有这个序号的投稿")
-    # 判断是否是匿名
-    displayname = "***（匿名投稿）" if cave.anonymous else cave.user_id
-    result = f"编号:{cave.id}\n"
-    result += "----------------------\n"
-    result += f"内容：\n{cave.details}\n"
-    result += "----------------------\n"
-    result += f"投稿人：{displayname}\n"
-    result += f"投稿时间：{cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-    result += "----------------------\n"
-    result += "可以私聊我投稿内容啊！\n投稿 [内容]（支持图片，文字）\n匿名投稿 [内容]（支持图片，文字）"
-    await cave_view.finish(Message(result))
+
+    async with get_session() as session:
+        stmt = select(cave_models).where(cave_models.id == int(key))
+        result = await session.execute(stmt)
+        cave = result.scalar_one_or_none()
+
+        if cave is None:
+            await cave_view.finish("没有这个序号的投稿")
+
+        # 判断是否是匿名
+        displayname = "***（匿名投稿）" if cave.anonymous else cave.user_id
+        result = f"编号:{cave.id}\n"
+        result += "----------------------\n"
+        result += f"内容：\n{cave.details}\n"
+        result += "----------------------\n"
+        result += f"投稿人：{displayname}\n"
+        result += f"投稿时间：{cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "----------------------\n"
+        result += "可以私聊我投稿内容啊！\n投稿 [内容]（支持图片，文字）\n匿名投稿 [内容]（支持图片，文字）"
+        await cave_view.finish(Message(result))
 
 
 @cave_history.handle()
 async def _(bot: Bot, event: MessageEvent):
     # 查询 userid 写所有数据
-    all_caves = await cave_models.all()
-    msg_list = [
-        "回声洞记录如下：",
-        *[
-            Message(
-                f"----------------------\n编号：{i.id}\n----------------------\n内容：\n{i.details}\n----------------------\n投稿时间：{i.time.strftime('%Y-%m-%d %H:%M:%S')}\n----------------------"
-            )
-            for i in all_caves
-            if i.user_id == event.user_id
-        ],
-    ]
-    await send_forward_msg(bot, event, Bot_NICKNAME, bot.self_id, msg_list)
+    async with get_session() as session:
+        stmt = select(cave_models).where(cave_models.user_id == event.user_id)
+        result = await session.execute(stmt)
+        all_caves = result.scalars().all()
+
+        msg_list = [
+            "回声洞记录如下：",
+            *[
+                Message(
+                    f"----------------------\n编号：{i.id}\n----------------------\n内容：\n{i.details}\n----------------------\n投稿时间：{i.time.strftime('%Y-%m-%d %H:%M:%S')}\n----------------------"
+                )
+                for i in all_caves
+            ],
+        ]
+        await send_forward_msg(bot, event, Bot_NICKNAME, bot.self_id, msg_list)
 
 
 async def send_forward_msg(

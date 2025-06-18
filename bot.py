@@ -68,6 +68,7 @@ async def disconnect_db():
 
 nonebot.load_from_toml("pyproject.toml")
 from nonebot.message import event_preprocessor
+
 from U1.model import Channel
 
 
