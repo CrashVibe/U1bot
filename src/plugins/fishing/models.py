@@ -3,7 +3,7 @@ from nonebot import require
 require("nonebot_plugin_orm")
 
 from nonebot_plugin_orm import Model
-from sqlalchemy import Boolean, Float, Integer, String, Text
+from sqlalchemy import Boolean, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -15,8 +15,6 @@ class FishingRecord(Model):
     time: Mapped[int] = mapped_column(Integer)
     frequency: Mapped[int] = mapped_column(Integer)
     fishes: Mapped[str] = mapped_column(Text)
-    coin: Mapped[float] = mapped_column(Float, default=0)
-    count_coin: Mapped[float] = mapped_column(Float, default=0)
 
 
 class FishingSwitch(Model):

@@ -9,6 +9,7 @@ from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot_plugin_orm import get_session
 from sqlalchemy import select, update
 
+from ..coin.api import add_coin, get_coin, get_count_coin
 from ..today_yunshi.models import MemberData
 from .config import config
 from .models import FishingRecord, FishingSwitch
@@ -49,13 +50,13 @@ async def update_sql():
                     del load_fishes[fish_name]
                     fish_removed = True
 
-            if fish_removed or fishes_record.coin != fishes_record.count_coin:
+            # 只保留鱼的处理逻辑，移除 coin/count_coin 相关逻辑
+            if fish_removed:
                 dump_fishes = json.dumps(load_fishes)
                 update_data.append(
                     {
                         "user_id": fishes_record.user_id,
                         "fishes": dump_fishes,
-                        "count_coin": fishes_record.coin,
                     }
                 )
 
@@ -64,7 +65,7 @@ async def update_sql():
                 stmt = (
                     update(FishingRecord)
                     .where(FishingRecord.user_id == data["user_id"])
-                    .values(fishes=data["fishes"], count_coin=data["count_coin"])
+                    .values(fishes=data["fishes"])
                 )
                 await session.execute(stmt)
             await session.commit()
@@ -224,11 +225,12 @@ async def get_stats(user_id: str) -> str:
             total_length = sum(
                 sum(fish_long)
                 for fish_long in json.loads(fishing_record.fishes).values()
-            )
+            )  # 查询金币插件的历史总金币
+            count_coin = await get_count_coin(user_id)
             return (
                 f"共钓到鱼次数 {fishing_record.frequency} 次\n"
                 f"背包内鱼总长度 {total_length}cm\n"
-                f"总共获得过 {fishing_record.count_coin} {fishing_coin_name}"
+                f"总共获得过 {count_coin} {fishing_coin_name}"
             )
         return "你还没有钓过鱼，快去钓鱼吧"
 
@@ -291,8 +293,7 @@ async def sell_quality_fish(user_id: str, quality: str) -> str:
                 for fish_name, fish_long in load_fishes.items()
                 if get_quality(fish_name) == quality
             )
-            coin = fishes_record.coin + price
-            count_coin = fishes_record.count_coin + price
+            await add_coin(user_id, price)
             load_fishes = {
                 fish_name: fish_long
                 for fish_name, fish_long in load_fishes.items()
@@ -303,7 +304,7 @@ async def sell_quality_fish(user_id: str, quality: str) -> str:
             stmt = (
                 update(FishingRecord)
                 .where(FishingRecord.user_id == user_id)
-                .values(fishes=dump_fishes, coin=coin, count_coin=count_coin)
+                .values(fishes=dump_fishes)
             )
             await session.execute(stmt)
             await session.commit()
@@ -326,13 +327,12 @@ async def sell_all_fish(user_id: str) -> str:
                 round(get_price(fish_name, sum(fish_long)), 2)
                 for fish_name, fish_long in load_fishes.items()
             )
-            coin = fishes_record.coin + price
-            count_coin = fishes_record.count_coin + price
-
+            # 使用金币插件接口
+            await add_coin(user_id, price)
             stmt = (
                 update(FishingRecord)
                 .where(FishingRecord.user_id == user_id)
-                .values(fishes="{}", coin=coin, count_coin=count_coin)
+                .values(fishes="{}")
             )
             await session.execute(stmt)
             await session.commit()
@@ -362,15 +362,15 @@ async def sell_fish(user_id: str, fish_name: str) -> str:
                 return "你的背包里没有这种鱼"
             fish_long = load_fishes[fish_name]
             price = round(get_price(fish_name, sum(fish_long)), 2)
-            coin = fishes_record.coin + price
-            count_coin = fishes_record.count_coin + price
+            # 更新金币
+            await add_coin(user_id, price)
             del load_fishes[fish_name]
             dump_fishes = json.dumps(load_fishes)
 
             stmt = (
                 update(FishingRecord)
                 .where(FishingRecord.user_id == user_id)
-                .values(fishes=dump_fishes, coin=coin, count_coin=count_coin)
+                .values(fishes=dump_fishes)
             )
             await session.execute(stmt)
             await session.commit()
@@ -380,14 +380,8 @@ async def sell_fish(user_id: str, fish_name: str) -> str:
 
 async def get_balance(user_id: str) -> str:
     """获取余额"""
-    async with get_session() as session:
-        stmt = select(FishingRecord).where(FishingRecord.user_id == user_id)
-        result = await session.execute(stmt)
-        fishes_record = result.scalar_one_or_none()
-
-        if fishes_record:
-            return f"你有 {fishes_record.coin} {fishing_coin_name}"
-        return "你什么也没有 :)"
+    coin = await get_coin(user_id)
+    return f"你有 {coin} {fishing_coin_name}" if coin else "你什么也没有 :)"
 
 
 async def switch_fish(event: GroupMessageEvent | PrivateMessageEvent) -> bool:
