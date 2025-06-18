@@ -1,27 +1,25 @@
-from tortoise import fields
-from tortoise.models import Model
+from datetime import datetime
 
-from U1.database import add_model
+from sqlalchemy import Boolean, DateTime, Float, Integer, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
-add_model(__name__)
+from U1.database import Model
 
 
 class FishingRecord(Model):
-    id = fields.IntField(pk=True)
-    user_id = fields.CharField(max_length=32)
-    time = fields.IntField()
-    frequency = fields.IntField()
-    fishes = fields.TextField()
-    coin = fields.FloatField(default=0)
-    count_coin = fields.FloatField(default=0)
+    __tablename__ = "fishing_fishingrecord"
 
-    class Meta:
-        table = "fishing_fishingrecord"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(Text)
+    time: Mapped[int] = mapped_column(Integer)
+    frequency: Mapped[int] = mapped_column(Integer)
+    fishes: Mapped[str] = mapped_column(Text)
+    coin: Mapped[float] = mapped_column(Float, default=0)
+    count_coin: Mapped[float] = mapped_column(Float, default=0)
 
 
 class FishingSwitch(Model):
-    group_id = fields.IntField(pk=True)
-    switch = fields.BooleanField(default=True)
+    __tablename__ = "fishing_fishingswitch"
 
-    class Meta:
-        table = "fishing_fishingswitch"
+    group_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    switch: Mapped[bool] = mapped_column(Boolean, default=True)

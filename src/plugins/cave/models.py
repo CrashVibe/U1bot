@@ -1,10 +1,10 @@
 # 导入插件方法
-from tortoise import fields
-from tortoise.models import Model
+from datetime import datetime
 
-from U1.database import add_model
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
-add_model(__name__)
+from U1.database import Model
 
 
 class cave_models(Model):
@@ -18,11 +18,11 @@ class cave_models(Model):
         time (datetime): The timestamp when the cave model was created.
     """
 
-    id = fields.IntField(pk=True, generated=True)
-    details = fields.TextField()
-    user_id = fields.BigIntField()
-    time = fields.DatetimeField(auto_now_add=True)
-    anonymous = fields.BooleanField(default=False)
+    __tablename__ = "cave_models"
 
-    class Meta:
-        table = "cave_models"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    details: Mapped[str] = mapped_column(Text)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    anonymous: Mapped[bool] = mapped_column(Boolean, default=False)
+
