@@ -208,7 +208,6 @@ async def save_fish(user_id: str, fish_name: str, fish_long: int) -> None:
                 time=time_now + fishing_limit,
                 frequency=1,
                 fishes=dump_fishes,
-                coin=0,
             )
             session.add(new_record)
             await session.commit()
