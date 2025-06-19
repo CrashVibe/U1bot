@@ -18,6 +18,13 @@ from .utils import (
 )
 
 
+def ensure_timezone_aware(dt: datetime) -> datetime:
+    """确保 datetime 对象具有时区信息，如果没有则添加 Asia/Shanghai 时区"""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=ZoneInfo("Asia/Shanghai"))
+    return dt
+
+
 async def morning_and_update(
     uid: int, gid: int, now_time: datetime
 ) -> tuple[int, int, str]:
@@ -44,7 +51,8 @@ async def morning_and_update(
 
         if target_user.night_time is None:
             raise ValueError("用户没有晚安记录哦")
-        sleep_time = now_time - target_user.night_time
+        night_time = ensure_timezone_aware(target_user.night_time)
+        sleep_time = now_time - night_time
 
         _, hours, minutes, seconds = total_seconds2tuple_time(
             int(sleep_time.total_seconds())
@@ -91,20 +99,18 @@ async def get_morning_msg(uid: int, gid: int) -> MessageSegment:
 
         if target_user and target_user.night_time:  # 用户存在
             # 判断是否隔日
-            last_sleep_time = target_user.night_time
+            last_sleep_time = ensure_timezone_aware(target_user.night_time)
             if last_sleep_time - now_time < timedelta(days=1):  # 没有隔日
                 # 是否是可以持续多次早安
                 if not settings.morning_mult_get_up_enable:
-                    if (
+                    if target_user.morning_time and now_time - ensure_timezone_aware(
                         target_user.morning_time
-                        and now_time - target_user.morning_time
-                        < timedelta(hours=settings.morning_mult_get_up_interval)
-                    ):
+                    ) < timedelta(hours=settings.morning_mult_get_up_interval):
                         msg = f"(｀へ′) {settings.morning_mult_get_up_interval} 小时内已经早安过啦~"
                         return MessageSegment.text(msg)
 
                 if not settings.morning_super_get_up_enable:
-                    if now_time - target_user.night_time < timedelta(
+                    if now_time - last_sleep_time < timedelta(
                         hours=settings.morning_super_get_up_interval
                     ):
                         msg = "睡这么点没关系吗？要不再睡一会吧... /_ \\"
@@ -163,7 +169,8 @@ async def night_and_update(
 
         in_day_tmp: None | str = None
         if target_user.morning_time:
-            in_day = now_time - target_user.morning_time
+            morning_time = ensure_timezone_aware(target_user.morning_time)
+            in_day = now_time - morning_time
             _, hours, minutes, seconds = total_seconds2tuple_time(
                 int(in_day.total_seconds())
             )
@@ -198,18 +205,17 @@ async def get_night_msg(uid: int, gid: int) -> MessageSegment:
 
         if target_user and target_user.night_time:  # 用户存在
             if settings.night_good_sleep_enable:
-                if now_time - target_user.night_time < timedelta(
+                night_time = ensure_timezone_aware(target_user.night_time)
+                if now_time - night_time < timedelta(
                     hours=settings.night_good_sleep_interval
                 ):
                     msg = f"(｀へ′)  {settings.night_good_sleep_interval} 小时内你已经晚安过啦~"
                     return MessageSegment.text(msg)
 
             if not settings.night_deep_sleep_enable:
-                if (
+                if target_user.morning_time and now_time - ensure_timezone_aware(
                     target_user.morning_time
-                    and now_time - target_user.morning_time
-                    < timedelta(hours=settings.night_deep_sleep_interval)
-                ):
+                ) < timedelta(hours=settings.night_deep_sleep_interval):
                     msg = "这是要睡回笼觉吗？要不再玩一会吧... /_ \\"
                     return MessageSegment.text(msg)
 
