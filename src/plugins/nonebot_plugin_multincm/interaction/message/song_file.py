@@ -1,6 +1,6 @@
 import mimetypes
 from contextlib import suppress
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from cookit.loguru import warning_suppress
 from httpx import AsyncClient
@@ -55,10 +55,11 @@ async def get_current_ev_receipt(msg_ids: Any):
         context=ev,
         exporter=exporter,
         msg_ids=msg_ids if isinstance(msg_ids, list) else [msg_ids],
+        uni_factory=UniMessage,
     )
 
 
-async def send_song_media_telegram(info: "SongInfo", as_file: bool = False):  # noqa: ARG001
+async def send_song_media_telegram(info: "SongInfo", as_file: bool = False):
     return await send_song_media_uni_msg(await download_song(info), info, as_file=False)
 
 
@@ -77,6 +78,8 @@ async def send_song_media_onebot_v11(info: "SongInfo", as_file: bool = False):
     async def send_file():
         from nonebot.adapters.onebot.v11 import (
             Bot as OB11Bot,
+        )
+        from nonebot.adapters.onebot.v11 import (
             GroupMessageEvent,
             PrivateMessageEvent,
         )
@@ -84,7 +87,7 @@ async def send_song_media_onebot_v11(info: "SongInfo", as_file: bool = False):
         bot = cast(OB11Bot, current_bot.get())
         event = current_event.get()
 
-        if not isinstance(event, (GroupMessageEvent, PrivateMessageEvent)):
+        if not isinstance(event, GroupMessageEvent | PrivateMessageEvent):
             raise TypeError("Event not supported")
 
         file = (
@@ -112,7 +115,7 @@ async def send_song_media_onebot_v11(info: "SongInfo", as_file: bool = False):
 async def send_song_media_platform_specific(
     info: "SongInfo",
     as_file: bool = False,
-) -> Optional[Receipt]:
+) -> Receipt | None:
     bot = current_bot.get()
     adapter_name = bot.adapter.get_name()
     processors = {

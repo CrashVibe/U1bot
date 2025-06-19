@@ -29,7 +29,7 @@ def upgrade(name: str = "") -> None:
             "anonymous",
             existing_type=mysql.TINYINT(display_width=1),
             nullable=False,
-            existing_server_default=sa.text("0"),
+            existing_server_default="0",
         )
         batch_op.drop_table_comment(
             existing_comment="Model representing the cave_models table in the database."
@@ -51,7 +51,7 @@ def downgrade(name: str = "") -> None:
             "anonymous",
             existing_type=mysql.TINYINT(display_width=1),
             nullable=True,
-            existing_server_default=sa.text("0"),
+            existing_server_default="0",
         )
 
     op.create_table(

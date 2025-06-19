@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from typing import List, Optional, Union, cast
+from typing import cast
 
 import psutil
 
@@ -17,11 +17,11 @@ class ProcessStatus:
 
 
 @periodic_collector()
-async def process_status() -> List[ProcessStatus]:
+async def process_status() -> list[ProcessStatus]:
     if not config.ps_proc_len:
         return []
 
-    async def parse_one(proc: psutil.Process) -> Optional[ProcessStatus]:
+    async def parse_one(proc: psutil.Process) -> ProcessStatus | None:
         name = proc.name()
         if match_list_regexp(config.ps_ignore_procs, name):
             # logger.info(f"进程 {name} 匹配 {regex.re.pattern}，忽略")
@@ -31,7 +31,9 @@ async def process_status() -> List[ProcessStatus]:
         # await asyncio.sleep(1)
         with proc.oneshot():
             cpu = proc.cpu_percent()
-            cpu = cpu / psutil.cpu_count() if config.ps_proc_cpu_max_100p else cpu
+            cpu_count = psutil.cpu_count()
+            if config.ps_proc_cpu_max_100p and cpu_count:
+                cpu = cpu / cpu_count
             mem: int = proc.memory_info().rss
 
         return ProcessStatus(name=name, cpu=cpu, mem=mem)
@@ -44,7 +46,7 @@ async def process_status() -> List[ProcessStatus]:
         return x.cpu
 
     proc_list = cast(
-        List[Union[Optional[ProcessStatus], Exception]],
+        list[ProcessStatus | None | Exception],
         await asyncio.gather(
             *(parse_one(proc) for proc in psutil.process_iter()),
             return_exceptions=True,

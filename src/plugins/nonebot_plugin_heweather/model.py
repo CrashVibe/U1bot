@@ -1,16 +1,10 @@
 from enum import IntEnum
 
-from nonebot.compat import PYDANTIC_V2, ConfigDict
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Now(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     obsTime: str
     temp: str
@@ -24,24 +18,14 @@ class Now(BaseModel):
 
 
 class NowApi(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     code: str
     now: Now
 
 
 class Daily(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     fxDate: str
     week: None | str = None
@@ -55,24 +39,14 @@ class Daily(BaseModel):
 
 
 class DailyApi(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     code: str
     daily: list[Daily]
 
 
 class Air(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     category: str
     aqi: str
@@ -86,24 +60,14 @@ class Air(BaseModel):
 
 
 class AirApi(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     code: str
     now: None | Air = None
 
 
 class Warning(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     title: str
     type: str
@@ -112,24 +76,14 @@ class Warning(BaseModel):
 
 
 class WarningApi(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     code: str
     warning: None | list[Warning] = None
 
 
 class Hourly(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     fxTime: str
     hour: None | str = None
@@ -140,12 +94,7 @@ class Hourly(BaseModel):
 
 
 class HourlyApi(BaseModel):
-    if PYDANTIC_V2:
-        model_config = ConfigDict(extra="allow")
-    else:
-
-        class Config:
-            extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
     code: str
     hourly: list[Hourly]
