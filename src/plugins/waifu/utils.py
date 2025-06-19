@@ -7,8 +7,6 @@ from nonebot import logger
 from nonebot.adapters.onebot.v11 import Message
 from pil_utils import Text2Image
 
-from .models import WaifuProtect
-
 defualt_md5 = "acef72340ac0e914090bd35799f5594e"
 
 
@@ -98,8 +96,11 @@ async def get_protected_users(group_id: int) -> list[int]:
     from nonebot_plugin_orm import get_session
     from sqlalchemy import select
 
+    from .models import WaifuProtectedUser
+
     async with get_session() as session:
-        stmt = select(WaifuProtect).where(WaifuProtect.group_id == group_id)
+        stmt = select(WaifuProtectedUser.user_id).where(
+            WaifuProtectedUser.group_id == group_id
+        )
         result = await session.execute(stmt)
-        protect = result.scalar_one_or_none()
-        return protect.user_ids if protect else []
+        return [row[0] for row in result.fetchall()]

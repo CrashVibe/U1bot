@@ -9,8 +9,7 @@ from nonebot.plugin import PluginMetadata
 from nonebot_plugin_apscheduler import scheduler
 
 require("nonebot_plugin_orm")
-from nonebot_plugin_orm import async_scoped_session
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from .card_pool import card_pool
 from .cp_list import cp_list
@@ -21,13 +20,10 @@ from .yinpa import yinpa
 __all__ = ["bye", "card_pool", "cp_list", "record", "yinpa"]
 from .config import Config, settings
 from .models import (
-    PWaifu,
-    WaifuCP,
     WaifuLock,
+    WaifuRelationship,
 )
 from .utils import (
-    get_bi_mapping,
-    get_bi_mapping_contains,
     get_message_at,
     get_protected_users,
     user_img,
@@ -92,12 +88,20 @@ async def reset_record():
     )
 
     from nonebot_plugin_orm import get_session
-    from sqlalchemy import delete
 
     async with get_session() as session:
-        for model in [WaifuCP, PWaifu, WaifuLock]:
-            stmt = delete(model).where(model.created_at == yesterday)
-            await session.execute(stmt)
+        # 删除所有关系记录
+        delete_relationships = delete(WaifuRelationship).where(
+            WaifuRelationship.created_at < yesterday
+        )
+        await session.execute(delete_relationships)
+
+        # 删除过期的锁定记录
+        delete_locks = delete(WaifuLock).where(
+            (WaifuLock.expires_at.is_not(None)) & (WaifuLock.expires_at < yesterday)
+        )
+        await session.execute(delete_locks)
+
         await session.commit()
 
 
@@ -108,43 +112,56 @@ async def mo_reset_record():
     )
 
     from nonebot_plugin_orm import get_session
-    from sqlalchemy import delete
 
     async with get_session() as session:
-        for model in [WaifuCP, PWaifu, WaifuLock]:
-            stmt = delete(model).where(model.created_at == yesterday)
-            await session.execute(stmt)
+        # 删除所有关系记录
+        delete_relationships = delete(WaifuRelationship).where(
+            WaifuRelationship.created_at < yesterday
+        )
+        await session.execute(delete_relationships)
+
+        # 删除过期的锁定记录
+        delete_locks = delete(WaifuLock).where(
+            (WaifuLock.expires_at.is_not(None)) & (WaifuLock.expires_at < yesterday)
+        )
+        await session.execute(delete_locks)
+
         await session.commit()
 
 
-async def get_or_create_cp_record(session, group_id: int):
-    """获取或创建 CP 记录"""
-    stmt = select(WaifuCP).where(WaifuCP.group_id == group_id)
+async def get_user_relationship(session, group_id: int, user_id: int):
+    """获取用户的CP关系（主动方或被动方）"""
+    stmt = (
+        select(WaifuRelationship)
+        .where(
+            WaifuRelationship.group_id == group_id,
+            (
+                (WaifuRelationship.user_id == user_id)
+                | (WaifuRelationship.partner_id == user_id)
+            ),
+        )
+        .limit(1)
+    )
     result = await session.execute(stmt)
-    record = result.scalar_one_or_none()
-
-    if record is None:
-        record = WaifuCP(group_id=group_id)
-        session.add(record)
-        await session.commit()
-        await session.refresh(record)
-
-    return record
+    return result.scalar_one_or_none()
 
 
-async def get_or_create_waifu_record(session, group_id: int):
-    """获取或创建群友记录"""
-    stmt = select(PWaifu).where(PWaifu.group_id == group_id)
+async def create_relationship(session, group_id: int, user_id: int, partner_id: int):
+    """创建CP关系"""
+    relationship = WaifuRelationship(
+        group_id=group_id, user_id=user_id, partner_id=partner_id
+    )
+    session.add(relationship)
+    await session.commit()
+
+
+async def get_taken_users(session, group_id: int) -> list[int]:
+    """获取已被娶的用户列表"""
+    stmt = select(WaifuRelationship.partner_id).where(
+        WaifuRelationship.group_id == group_id
+    )
     result = await session.execute(stmt)
-    record = result.scalar_one_or_none()
-
-    if record is None:
-        record = PWaifu(group_id=group_id)
-        session.add(record)
-        await session.commit()
-        await session.refresh(record)
-
-    return record
+    return [row[0] for row in result.fetchall()]
 
 
 scheduler.add_job(reset_record, "cron", hour=0, minute=0, misfire_grace_time=120)
@@ -163,40 +180,52 @@ async def handle_waifu(bot: Bot, event: GroupMessageEvent):
     from nonebot_plugin_orm import get_session
 
     async with get_session() as session:
-        # 获取 CP 记录
-        cp_record = await get_or_create_cp_record(session, group_id)
-
-        # 检查已有 CP
-        if existing_cp := get_bi_mapping(cp_record.affect, user_id):
-            return await handle_existing_cp(bot, event, existing_cp)
+        # 检查是否已有CP
+        existing_relationship = await get_user_relationship(session, group_id, user_id)
+        if existing_relationship:
+            # 确定伴侣ID（如果用户是主动方，取partner_id；如果是被动方，取user_id）
+            if existing_relationship.user_id == user_id:
+                partner_id = existing_relationship.partner_id
+            else:
+                partner_id = existing_relationship.user_id
+            return await handle_existing_cp(bot, event, partner_id)
 
         # 选择逻辑
-        selected = await select_waifu(bot, event, cp_record)
+        selected = await select_waifu(bot, event, session, group_id, user_id)
         if not selected:
             return await waifu.finish(random.choice(no_waifu), at_sender=True)
 
         # 保存记录
-        await update_records(session, group_id, user_id, selected)
+        await create_relationship(session, group_id, user_id, selected)
         await send_result(bot, event, selected)
 
 
 async def select_waifu(
-    bot: Bot, event: GroupMessageEvent, cp_record: WaifuCP
+    bot: Bot, event: GroupMessageEvent, session, group_id: int, user_id: int
 ) -> int | None:
     """核心选择逻辑"""
-    group_id = event.group_id
-    user_id = event.user_id
     protected = await get_protected_users(group_id)
+
+    # 获取已被娶的人列表
+    taken_users = await get_taken_users(session, group_id)
+
     select = None
     # 尝试通过 @ 选择
     if at := get_message_at(event.message):
-        select = await handle_at_selection(bot, event, at[0], protected, cp_record)
+        select = await handle_at_selection(bot, event, at[0], protected, taken_users)
     if select is not None:
         return select
+
+    # 获取可用成员，排除已被娶的人和已有CP的人
     members = await get_available_members(bot, group_id, protected)
-    select = random.choice(members)
-    if select == user_id or get_bi_mapping_contains(cp_record.affect, select):
+    available_members = [
+        member for member in members if member != user_id and member not in taken_users
+    ]
+
+    if not available_members:
         return None
+
+    select = random.choice(available_members)
     return select
 
 
@@ -231,19 +260,6 @@ async def handle_existing_cp(bot: Bot, event: GroupMessageEvent, existing_cp: in
     await bot.send(event, Message(msg), at_sender=True)
 
 
-async def update_records(session, group_id: int, user_id: int, selected: int):
-    record_cp = await get_or_create_cp_record(session, group_id)
-
-    record_cp.affect[str(user_id)] = selected
-    session.add(record_cp)
-
-    record_waifu = await get_or_create_waifu_record(session, group_id)
-    record_waifu.waifu_list.append(selected)
-    session.add(record_waifu)
-
-    await session.commit()
-
-
 async def send_result(bot: Bot, event: GroupMessageEvent, selected: int):
     member = await bot.get_group_member_info(group_id=event.group_id, user_id=selected)
     msg = (
@@ -259,14 +275,14 @@ async def handle_at_selection(
     event: GroupMessageEvent,
     at_user_id: int,
     protected_users: list[int],
-    cp_record: WaifuCP,
+    taken_users: list[int],
 ) -> int | None:
     """
     处理通过 @ 指定群友的逻辑
     :param event: 消息事件
     :param at_user_id: 被 @ 的用户 ID
     :param protected_users: 受保护的用户列表
-    :param cp_record: CP 记录（模型实例）
+    :param taken_users: 已被娶的群友列表
     :return: 选择的用户 ID 或 None
     """
     user_id = event.user_id
@@ -280,12 +296,9 @@ async def handle_at_selection(
     if at_user_id in protected_users:
         return None
 
-    # 检查是否已有 CP
-    if existing_cp := get_bi_mapping(cp_record.affect, user_id):
-        if at_user_id == existing_cp:
-            return at_user_id
-        else:
-            return None
+    # 检查是否已被娶
+    if at_user_id in taken_users:
+        return None
 
     # 随机选择逻辑
     X = random.randint(1, 100)

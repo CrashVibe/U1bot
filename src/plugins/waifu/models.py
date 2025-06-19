@@ -1,59 +1,156 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from nonebot import require
 
 require("nonebot_plugin_orm")
 
 from nonebot_plugin_orm import Model
-from sqlalchemy import JSON, BigInteger, DateTime
+from sqlalchemy import BigInteger, Boolean, DateTime, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class BaseGroupModel(Model):
-    __abstract__ = True
-
-    group_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+def get_current_time():
+    """获取当前时间（亚洲/上海时区）"""
+    return datetime.now(ZoneInfo("Asia/Shanghai"))
 
 
-class WaifuProtect(BaseGroupModel):
-    __tablename__ = "waifu_protect"
+class WaifuRelationship(Model):
+    """娶群友关系表 - 记录用户之间的CP关系"""
 
-    user_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    __tablename__ = "waifu_relationships"
 
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    partner_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=get_current_time, nullable=False
+    )
 
-class WaifuCP(BaseGroupModel):
-    __tablename__ = "waifu_cp"
-
-    affect: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
-
-
-class PWaifu(BaseGroupModel):
-    __tablename__ = "waifu"
-
-    waifu_list: Mapped[list[int]] = mapped_column(JSON, default=[])
-
-
-class WaifuLock(BaseGroupModel):
-    __tablename__ = "waifu_lock"
-
-    lock: Mapped[dict] = mapped_column(JSON, default={})
-
-
-class YinpaRecord(Model):
-    __abstract__ = True
-
-    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    active_count: Mapped[int] = mapped_column(default=0)
-    passive_count: Mapped[int] = mapped_column(default=0)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.now, onupdate=datetime.now
+    __table_args__ = (
+        # 确保同一群组中，一个用户只能有一个CP
+        UniqueConstraint("group_id", "user_id", name="uq_group_user"),
+        # 确保同一群组中，一个用户不能被多个人娶
+        UniqueConstraint("group_id", "partner_id", name="uq_group_partner"),
+        # 添加索引优化查询性能
+        Index("ix_group_user", "group_id", "user_id"),
+        Index("ix_group_partner", "group_id", "partner_id"),
+        Index("ix_created_at", "created_at"),
     )
 
 
-class YinpaActive(YinpaRecord):
+class WaifuProtectedUser(Model):
+    """受保护用户表 - 记录不能被娶的用户"""
+
+    __tablename__ = "waifu_protected_users"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=get_current_time, nullable=False
+    )
+
+    __table_args__ = (
+        # 确保同一群组中，同一用户不能重复添加保护
+        UniqueConstraint("group_id", "user_id", name="uq_protected_group_user"),
+        Index("ix_protected_group_user", "group_id", "user_id"),
+    )
+
+
+class WaifuLock(Model):
+    """用户锁定表 - 记录用户的锁定状态"""
+
+    __tablename__ = "waifu_locks"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    lock_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="general"
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=True
+    )  # 过期时间，None表示永久
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=get_current_time, nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "group_id", "user_id", "lock_type", name="uq_lock_group_user_type"
+        ),
+        Index("ix_lock_group_user", "group_id", "user_id"),
+        Index("ix_lock_expires", "expires_at"),
+        Index("ix_lock_active", "is_active"),
+    )
+
+
+class YinpaRecord(Model):
+    """透群友记录表"""
+
+    __tablename__ = "yinpa_records"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    active_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # 主动方
+    passive_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # 被动方
+    success: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )  # 是否成功
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=get_current_time, nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_yinpa_group_active", "group_id", "active_user_id"),
+        Index("ix_yinpa_group_passive", "group_id", "passive_user_id"),
+        Index("ix_yinpa_created", "created_at"),
+        Index("ix_yinpa_success", "success"),
+    )
+
+
+class WaifuDailyReset(Model):
+    """每日重置记录表 - 记录每日重置的时间戳"""
+
+    __tablename__ = "waifu_daily_resets"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    reset_date: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False
+    )  # 重置日期（只到日期，不包含时间）
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=get_current_time, nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "reset_date", name="uq_group_reset_date"),
+        Index("ix_reset_group_date", "group_id", "reset_date"),
+    )
+
+
+class YinpaActive(Model):
+    """透群友主动记录表"""
+
     __tablename__ = "yinpa_active"
 
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    active_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=get_current_time, onupdate=get_current_time, nullable=False
+    )
 
-class YinpaPassive(YinpaRecord):
+
+class YinpaPassive(Model):
+    """透群友被动记录表"""
+
     __tablename__ = "yinpa_passive"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    passive_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=get_current_time, onupdate=get_current_time, nullable=False
+    )
