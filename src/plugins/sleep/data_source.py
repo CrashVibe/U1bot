@@ -74,12 +74,17 @@ async def morning_and_update(
 
         # 判断今天第几个起床
         target_group.morning_count += 1
-        await session.commit()
 
+        # 在提交前计算服务器排名，避免分离对象问题
         server_morning_count = sum(group.morning_count for group in all_groups)
         server_rank = server_morning_count
 
-        return target_group.morning_count, server_rank, in_sleep_tmp
+        # 获取当前群组早安次数（在提交前）
+        current_group_morning_count = target_group.morning_count
+
+        await session.commit()
+
+        return current_group_morning_count, server_rank, in_sleep_tmp
 
 
 async def get_morning_msg(uid: int, gid: int) -> MessageSegment:
@@ -178,12 +183,16 @@ async def night_and_update(
                 in_day_tmp = f"{hours}小时{minutes}分钟{seconds}秒"
 
         target_group.night_count += 1
-        await session.commit()
 
         server_night_count = sum(group.night_count for group in all_groups)
         server_rank = server_night_count
 
-        return target_group.night_count, server_rank, in_day_tmp
+        # 获取当前群组晚安次数
+        current_group_night_count = target_group.night_count
+
+        await session.commit()
+
+        return current_group_night_count, server_rank, in_day_tmp
 
 
 async def get_night_msg(uid: int, gid: int) -> MessageSegment:
