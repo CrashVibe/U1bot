@@ -9,6 +9,7 @@ require("nonebot_plugin_orm")
 from nonebot_plugin_orm import get_session
 from sqlalchemy import delete, select
 
+from ..coin.api import subtract_coin
 from .models import WaifuLock, WaifuRelationship
 
 # 初始化全局缓存
@@ -39,16 +40,26 @@ async def handle_divorce(event: GroupMessageEvent):
         relationship_result = await session.execute(relationship_stmt)
         relationship = relationship_result.scalar_one_or_none()
 
-        if not relationship:
-            await bye.finish("你还没结婚呢...", at_sender=True)
+    if not relationship:
+        await bye.finish("你还没结婚呢...", at_sender=True)
 
-        # 正常CD逻辑
-        if not check_divorce_cd(user_id):
-            await bye.finish("离婚冷静期还没过呢...", at_sender=True)
+    success = False
+
+    # 正常CD逻辑
+    if not check_divorce_cd(user_id):
+        # 检查并扣除 500 次元币
+        success, remaining_coin = await subtract_coin(str(user_id), 500.0)
+        if not success:
+            await bye.finish("离婚冷静期还没过呢...", at_sender=True) # 这里直接退出
+        await bye.send(
+            f"离婚冷静期还没过呢... 不过你花费了 500 次元币，剩余 {remaining_coin} 次元币。",
+            at_sender=True,
+        )
 
     # 执行离婚
     await process_divorce(group_id, user_id)
-    await bye.finish(random.choice(["嗯。", "...", "好。", "哦。", "行。"]))
+    if not success:
+        await bye.finish(random.choice(["嗯。", "...", "好。", "哦。", "行。"]))
 
 
 def check_divorce_cd(user_id: int) -> bool:
