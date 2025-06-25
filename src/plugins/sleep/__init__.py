@@ -115,57 +115,48 @@ async def _(bot: Bot, event: GroupMessageEvent):
 
     user_data = await get_weekly_sleep_data(uid)
 
-    if isinstance(user_data, str):
-        await my_sleep.finish(user_data, reply_message=True)
-
-    (
-        weekly_sleep_time,
-        weekly_morning_cout,
-        weekly_night_cout,
-        weekly_earliest_morning_time,  # datetime | str
-        weekly_latest_night_time,  # datetime | str
-        lastweek_sleep_time,
-        lastweek_morning_cout,
-        lastweek_night_cout,
-        lastweek_earliest_morning_time,  # datetime | str
-        lastweek_latest_night_time,  # datetime | str
-    ) = user_data
+    if user_data is None:
+        await my_sleep.finish("未找到你的作息数据呢......", reply_message=True)
 
     today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y年%m月%d日")
 
-    if isinstance(weekly_earliest_morning_time, datetime):
-        weekly_earliest_morning_time = weekly_earliest_morning_time.strftime(
-            "%Y年%m月%d日 %H:%M:%S"
-        )
-    if isinstance(weekly_latest_night_time, datetime):
-        weekly_latest_night_time = weekly_latest_night_time.strftime(
-            "%Y年%m月%d日 %H:%M:%S"
-        )
-    if isinstance(lastweek_earliest_morning_time, datetime):
-        lastweek_earliest_morning_time = lastweek_earliest_morning_time.strftime(
-            "%Y年%m月%d日 %H:%M:%S"
-        )
-    if isinstance(lastweek_latest_night_time, datetime):
-        lastweek_latest_night_time = lastweek_latest_night_time.strftime(
-            "%Y年%m月%d日 %H:%M:%S"
-        )
+    # 格式化时间显示
+    def format_time(dt: datetime | None) -> str:
+        if dt is None:
+            return "无"
+        return dt.strftime("%Y年%m月%d日 %H:%M:%S")
+
+    # 格式化睡眠时长（从秒转换为小时分钟）
+    def format_sleep_time(seconds: int) -> str:
+        if seconds == 0:
+            return "0小时"
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+        if hours > 0 and minutes > 0:
+            return f"{hours}小时{minutes}分钟"
+        elif hours > 0:
+            return f"{hours}小时"
+        else:
+            return f"{minutes}分钟"
 
     msg = (
         f"✨ 我的作息 ({today}) ✨\n"
         f"╔═══════════\n"
         f"║ 本周统计:\n"
-        f"║  睡觉时长: {weekly_sleep_time}分钟\n"
-        f"║  早安次数: {weekly_morning_cout}\n"
-        f"║  晚安次数: {weekly_night_cout}\n"
-        f"║  最早起床: {weekly_earliest_morning_time}\n"
-        f"║  最晚睡觉: {weekly_latest_night_time}\n"
+        f"║  睡觉时长: {format_sleep_time(user_data.weekly_sleep_time)}\n"
+        f"║  平均睡眠: {user_data.weekly_avg_sleep_hours:.1f}小时/天\n"
+        f"║  早安次数: {user_data.weekly_morning_count}\n"
+        f"║  晚安次数: {user_data.weekly_night_count}\n"
+        f"║  最早起床: {format_time(user_data.weekly_earliest_morning)}\n"
+        f"║  最晚睡觉: {format_time(user_data.weekly_latest_night)}\n"
         f"╠═══════════\n"
         f"║ 上周统计:\n"
-        f"║  睡觉时长: {lastweek_sleep_time}分钟\n"
-        f"║  早安次数: {lastweek_morning_cout}\n"
-        f"║  晚安次数: {lastweek_night_cout}\n"
-        f"║  最早起床: {lastweek_earliest_morning_time}\n"
-        f"║  最晚睡觉: {lastweek_latest_night_time}\n"
+        f"║  睡觉时长: {format_sleep_time(user_data.lastweek_sleep_time)}\n"
+        f"║  平均睡眠: {user_data.lastweek_avg_sleep_hours:.1f}小时/天\n"
+        f"║  早安次数: {user_data.lastweek_morning_count}\n"
+        f"║  晚安次数: {user_data.lastweek_night_count}\n"
+        f"║  最早起床: {format_time(user_data.lastweek_earliest_morning)}\n"
+        f"║  最晚睡觉: {format_time(user_data.lastweek_latest_night)}\n"
         f"╚═══════════"
     )
 
