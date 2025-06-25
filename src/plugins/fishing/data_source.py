@@ -1,20 +1,15 @@
 import random
 import time
-from os import path
-from pathlib import Path
 
-import aiofiles
 import ujson as json
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
 from nonebot_plugin_orm import get_session
 from sqlalchemy import select, update
 
 from ..coin.api import add_coin, get_coin, get_count_coin
-from ..today_yunshi.models import MemberData
+from ..today_yunshi.data_source import get_user_luck_star
 from .config import config
 from .models import FishingRecord, FishingSwitch
-
-luckpath = Path(path.join("./src/plugins/today_yunshi", "Fortune.json"))
 
 fishing_coin_name = config.fishing_coin_name
 fish_rotten = config.fish_rotten
@@ -102,7 +97,8 @@ async def get_weight(
     user_id: str, fish_quality: list[str]
 ) -> tuple[list[int], bool, int | None]:
     """
-    根据用户运势调整鱼的权重，并返回相应的权重值。    - 参数
+    根据用户运势调整鱼的权重，并返回相应的权重值。
+    - 参数
       - user_id: 用户的唯一标识符
       - fish_quality: 包含鱼种质量的列表
     - 返回
@@ -110,33 +106,24 @@ async def get_weight(
       - 一个布尔值，指示是否进行了调整
       - 运势星级数（如果有的话），否则为 None
     """
-    luck_star_num = None
-    try:
-        async with get_session() as session:
-            stmt = select(MemberData).where(MemberData.user_id == user_id)
-            result = await session.execute(stmt)
-            luck = result.scalar_one_or_none()
-
-            if luck is not None and luck.time.strftime("%Y-%m-%d") == time.strftime(
-                "%Y-%m-%d"
-            ):
-                async with aiofiles.open(luckpath, encoding="utf-8") as f:
-                    luckdata = json.loads(await f.read())
-                    luck_star_num = (
-                        luckdata.get(str(luck.luckid), {}).get("星级", "").count("★")
-                    )
-    except (OSError, json.JSONDecodeError) as e:
-        print(f"Error reading or parsing luck data: {e}")
+    luck_star_num = await get_user_luck_star(user_id)
 
     adjustment_made = False
+    # 创建临时权重列表，不修改全局 fish 字典
+    weights = []
+
     for key in fish_quality:
+        original_weight = fish[key]["weight"]
         if key in ["隐火", "虚空", "金"] and luck_star_num is not None:
+            # 只要有运势就标记为调整过，不管权重是否实际变化
+            adjustment_made = True
             weight_increase = calculate_weight_increase(luck_star_num)
-            new_weight = min(fish[key]["weight"] + weight_increase, MAX_WEIGHT_INCREASE)
-            if new_weight != fish[key]["weight"]:
-                fish[key]["weight"] = new_weight
-                adjustment_made = True
-    return [fish[key]["weight"] for key in fish_quality], adjustment_made, luck_star_num
+            new_weight = min(original_weight + weight_increase, MAX_WEIGHT_INCREASE)
+            weights.append(int(new_weight))
+        else:
+            weights.append(original_weight)
+
+    return weights, adjustment_made, luck_star_num
 
 
 async def choice(user_id: str) -> tuple[str, int, bool, int | None]:

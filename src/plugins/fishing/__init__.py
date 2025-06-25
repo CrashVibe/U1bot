@@ -81,7 +81,7 @@ async def _fishing(event: Event):
         await fishing.finish("钓鱼在本群处于关闭状态，请看菜单重新打开")
     user_id = event.get_user_id()
     fish = await choice(user_id=user_id)
-    if fish[2] and fish[3] != 0:
+    if fish[2] and fish[3] is not None and fish[3] != 0:
         await fishing.send(f"正在钓鱼…\n使用运气[{fish[3]}]加成")
     else:
         await fishing.send("正在钓鱼…")
@@ -178,9 +178,7 @@ async def send_forward_msg(
 
     messages = [to_json(msg) for msg in msgs]
     if isinstance(event, GroupMessageEvent):
-        return await bot.call_api(
-            "send_group_forward_msg", group_id=event.group_id, messages=messages
+        return await bot.send_group_forward_msg(
+            group_id=event.group_id, messages=messages
         )
-    return await bot.call_api(
-        "send_private_forward_msg", user_id=event.user_id, messages=messages
-    )
+    return await bot.send_private_forward_msg(user_id=event.user_id, messages=messages)
