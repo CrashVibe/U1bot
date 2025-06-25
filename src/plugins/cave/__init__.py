@@ -23,13 +23,18 @@ nickname_list = list(get_driver().config.nickname)
 Bot_NICKNAME = nickname_list[0] if nickname_list else "bot"
 __plugin_meta__ = PluginMetadata(
     name="回声洞",
-    description="看看别人的投稿，也可以自己投稿~",
-    usage="""投稿 (消耗200次元币)\n
-匿名投稿 (消耗200次元币)\n
-查看回声洞记录\n
-删除 [序号]\n
-如：\n
-投稿""",
+    description="看看别人的投稿，也可以自己投稿",
+    usage="""投稿 (消耗200次元币)
+匿名投稿 (消耗400次元币)
+查看回声洞记录
+删除 [序号]
+查看 [序号]
+
+示例:
+投稿 今天天气真不错
+匿名投稿 分享一个小秘密
+删除 1
+查看 1""",
 )
 
 
@@ -65,7 +70,7 @@ async def _():
 
         # 提示信息
         await cave_update.send(
-            f"共有{len(all_caves)}条记录，{len(new_caves)}条不重复记录"
+            f"共有 {len(all_caves)} 条记录，{len(new_caves)} 条不重复记录"
         )
 
         # 删除所有记录
@@ -111,20 +116,20 @@ async def _():
             session.add(sorted_cave)
         await session.commit()
 
-    await cave_update.finish("更新成功！")
+    await cave_update.finish("回声洞更新完成")
 
 
 async def condition(event: MessageEvent, key: str) -> tuple[bool, str | None]:
     "判断是否符合投稿条件"
     urllist = extract_image_urls(event.get_message())
     if len(urllist) > 1:
-        return False, "只能投一张图哦"
+        return False, "呃，投稿只能包含一张图片诶~\n再斟酌一下你的投稿内容吧~"
     if not isinstance(event, PrivateMessageEvent):
-        return False, "别搞啊，只能私聊我才能投稿啊！"
+        return False, "还是请来私聊我投稿罢~"
     if not key:
-        return False, "不输入内容，小子你是想让我投稿什么？空气咩？"
+        return False, "你输入了什么？一个......空气？\n请在投稿内容前加上“投稿”或“匿名投稿”"
     if len(key) < 6:
-        return False, "字数太少了！"
+        return False, "太短了罢~\n投稿内容至少需要6个字符，不要吝啬你的字数哦~"
     return True, None
 
 
@@ -151,19 +156,18 @@ async def _(bot: Bot, event: MessageEvent):
         await session.commit()
         await session.refresh(caves)
 
-        result = f"预览：\n编号:{caves.id}\n"
-        result += "----------------------\n"
-        result += f"内容：\n{caves.details}\n"
-        result += "----------------------\n"
-        result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "----------------------\n"
-        result += f"消耗了 200 次元币，剩余 {remaining_coin:.1f} 次元币"
+        result = f"[投稿成功]\n编号: {caves.id}\n"
+        result += "=" * 30 + "\n"
+        result += f"{caves.details}\n"
+        result += "=" * 30 + "\n"
+        result += f"投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += f"消耗次元币: 200 | 余额: {remaining_coin:.1f}"
         for i in SUPERUSER_list:
             await bot.send_private_msg(
                 user_id=int(i),
                 message=Message(f"来自用户{event.get_user_id()}\n{result}"),
             )
-        await cave_add.finish(Message(f"投稿成功！\n{result}"))
+        await cave_add.finish(Message(f"{result}"))
 
 
 @cave_am_add.handle()
@@ -190,20 +194,19 @@ async def _(bot: Bot, event: MessageEvent):
         await session.commit()
         await session.refresh(caves)
 
-        result = f"预览：\n编号:{caves.id}\n"
-        result += "----------------------\n"
-        result += f"内容：\n{caves.details}\n"
-        result += "----------------------\n"
-        result += f"投稿时间：{caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "----------------------\n"
-        result += "匿名投稿将会保存用户信息\n但其他用户无法看到作者\n"
-        result += f"消耗了 400 次元币，剩余 {remaining_coin:.1f} 次元币"
+        result = f"[匿名投稿成功]\n编号: {caves.id}\n"
+        result += "=" * 30 + "\n"
+        result += f"{caves.details}\n"
+        result += "=" * 30 + "\n"
+        result += f"投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "匿名投稿会保存用户信息但其他用户无法看到作者\n"
+        result += f"消耗次元币: 400 | 余额: {remaining_coin:.1f}"
         for i in SUPERUSER_list:
             await bot.send_private_msg(
                 user_id=int(i),
                 message=Message(f"来自用户{event.get_user_id()}\n{result}"),
             )
-        await cave_am_add.finish(Message(f"匿名投稿成功！\n{result}"))
+        await cave_am_add.finish(Message(f"{result}"))
 
 
 @cave_del.handle()
@@ -232,7 +235,7 @@ async def _(bot: Bot, event: MessageEvent):
                 await bot.send_private_msg(
                     user_id=data.user_id,
                     message=Message(
-                        f"你的投稿{key}已经被{event.user_id}删除了！\n内容为：\n{data.details}\n原因：{reason}"
+                        f"您的投稿 #{key} 已被管理员删除\n内容: {data.details}\n删除原因: {reason}"
                     ),
                 )
             except Exception:
@@ -245,19 +248,17 @@ async def _(bot: Bot, event: MessageEvent):
             await session.delete(data)
             await session.commit()
             await cave_del.finish(
-                Message(
-                    f"删除成功！编号{key}的投稿已经被删除！\n内容为：\n{result_content}"
-                )
+                Message(f"[删除成功] 编号 {key} 的投稿已删除\n内容: {result_content}")
             )
         else:
-            await cave_del.finish("你不是投稿人，也不是作者的，你想干咩？")
+            await cave_del.finish("您没有权限删除此投稿")
 
         result_content = data.details
         await session.delete(data)
         await session.commit()
         await cave_del.finish(
             Message(
-                f"删除成功！编号{key}的投稿已经被删除！\n内容为：\n{result_content}\n原因：{reason}"
+                f"[删除成功] 编号 {key} 的投稿已删除\n内容: {result_content}\n删除原因: {reason}"
             )
         )
 
@@ -270,20 +271,19 @@ async def _():
         all_caves = result.scalars().all()
 
         if not all_caves:
-            await cave_main.finish("暂时没有投稿哦~")
+            await cave_main.finish("回声洞暂时还没有投稿呢")
 
         random_cave = random.choice(all_caves)
         displayname = (
-            "***（匿名投稿）" if random_cave.anonymous else random_cave.user_id
+            "匿名用户" if random_cave.anonymous else f"用户{random_cave.user_id}"
         )
-        result = f"编号:{random_cave.id}\n"
-        result += "----------------------\n"
-        result += f"内容：\n{random_cave.details}\n"
-        result += "----------------------\n"
-        result += f"投稿人：{displayname}\n"
-        result += f"投稿时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "----------------------\n"
-        result += "可以私聊我投稿内容啊！\n投稿 [内容]（支持图片，文字）\n匿名投稿 [内容]（支持图片，文字）"
+        result = f"[回声洞 #{random_cave.id}]\n"
+        result += "=" * 30 + "\n"
+        result += f"{random_cave.details}\n"
+        result += "=" * 30 + "\n"
+        result += f"投稿人: {displayname}\n"
+        result += f"时间: {random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
         await cave_main.finish(Message(result))
 
 
@@ -302,15 +302,14 @@ async def _(args: Message = CommandArg()):
             await cave_view.finish("没有这个序号的投稿")
 
         # 判断是否是匿名
-        displayname = "***（匿名投稿）" if cave.anonymous else cave.user_id
-        result = f"编号:{cave.id}\n"
-        result += "----------------------\n"
-        result += f"内容：\n{cave.details}\n"
-        result += "----------------------\n"
-        result += f"投稿人：{displayname}\n"
-        result += f"投稿时间：{cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "----------------------\n"
-        result += "可以私聊我投稿内容啊！\n投稿 [内容]（支持图片，文字）\n匿名投稿 [内容]（支持图片，文字）"
+        displayname = "匿名用户" if cave.anonymous else f"用户{cave.user_id}"
+        result = f"[回声洞 #{cave.id}]\n"
+        result += "=" * 30 + "\n"
+        result += f"{cave.details}\n"
+        result += "=" * 30 + "\n"
+        result += f"投稿人: {displayname}\n"
+        result += f"时间: {cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
         await cave_view.finish(Message(result))
 
 
@@ -323,10 +322,14 @@ async def _(bot: Bot, event: MessageEvent):
         all_caves = result.scalars().all()
 
         msg_list = [
-            "回声洞记录如下：",
+            "您的回声洞投稿记录:",
             *[
                 Message(
-                    f"----------------------\n编号：{i.id}\n----------------------\n内容：\n{i.details}\n----------------------\n投稿时间：{i.time.strftime('%Y-%m-%d %H:%M:%S')}\n----------------------"
+                    f"编号: {i.id}\n"
+                    f"=" * 20 + "\n"
+                    f"{i.details}\n"
+                    f"=" * 20 + "\n"
+                    f"投稿时间: {i.time.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
                 for i in all_caves
             ],
