@@ -213,14 +213,9 @@ async def _(bot: Bot, event: MessageEvent):
     key = deletion_reasons["序号"]
     # 如果有原因获取，没有为 none
     reason = deletion_reasons["原因"]
-
-    # 检查序号是否有效
-    if key is None:
-        await cave_del.finish("请输入正确的序号")
-
     try:
         key = int(key)
-    except (ValueError, TypeError):
+    except ValueError:
         await cave_del.finish("请输入正确的序号")
 
     async with get_session() as session:
@@ -298,14 +293,8 @@ async def _(args: Message = CommandArg()):
     if not key:
         await cave_view.finish("请输入编号")
 
-    # 验证输入是否为有效的数字
-    try:
-        key_id = int(key)
-    except ValueError:
-        return
-
     async with get_session() as session:
-        stmt = select(cave_models).where(cave_models.id == key_id)
+        stmt = select(cave_models).where(cave_models.id == int(key))
         result = await session.execute(stmt)
         cave = result.scalar_one_or_none()
 
@@ -406,15 +395,10 @@ def extract_deletion_reason(text):
         else:
             # 当遇到第一个非数字字符时，余下部分全是原因
             reason = cleaned_text[idx:].strip()
-            break  # 若没有原因，则设为默认值 "作者删除"
+            break
+
+    # 若没有原因，则设为默认值 "作者删除"
     if not reason:
         reason = "作者删除"
 
-    # 验证序号是否为有效数字
-    if not num:
-        return {"序号": None, "原因": reason}
-
-    try:
-        return {"序号": int(num), "原因": reason}
-    except ValueError:
-        return {"序号": None, "原因": reason}
+    return {"序号": int(num), "原因": reason}
