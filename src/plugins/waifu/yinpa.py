@@ -3,7 +3,7 @@ import time
 
 from cachetools import TTLCache
 from nonebot import on_command, require
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, MessageSegment
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import get_session
@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from .config import settings
 from .models import YinpaActive, YinpaPassive
-from .utils import get_message_at, get_protected_users
+from .utils import get_message_at, get_protected_users, user_img
 
 cd_cache = TTLCache(maxsize=1000, ttl=3600)  # 1小时过期
 
@@ -77,7 +77,7 @@ async def handle_yinpa(bot: Bot, event: GroupMessageEvent):
         await session.commit()
 
     # 生成结果消息
-    msg = generate_yinpa_result(success, target)
+    msg = await generate_yinpa_result(bot, event, success, target)
     await yinpa.finish(msg, at_sender=True)
 
 
@@ -119,9 +119,43 @@ async def process_yinpa() -> bool:
     return rand <= YINPA_HE
 
 
-def generate_yinpa_result(success: bool, passive: int) -> str:
+async def generate_yinpa_result(
+    bot: Bot, event: GroupMessageEvent, success: bool, target: int
+) -> Message:
     """生成涩涩结果消息"""
+    # 获取目标用户信息
+    member = await bot.get_group_member_info(group_id=event.group_id, user_id=target)
+    target_name = member["card"] or member["nickname"]
+
     if success:
-        return f"成功对{passive}进行了不可描述之事！{random.choice(['🥵', '😋', '🤤'])}"
+        success_messages = [
+            "成功了！",
+            "大成功！",
+            "完美执行！",
+            "太棒了！",
+            "成功完成了不可描述之事！",
+            "任务达成！",
+        ]
+        msg = (
+            f"{random.choice(success_messages)}\n"
+            f"{MessageSegment.image(await user_img(target))}"
+            f"目标：『{target_name}』\n"
+            f"结果：成功 {random.choice(['🥵', '😋', '🤤', '💕', '✨'])}"
+        )
     else:
-        return f"被{passive}反杀了！{random.choice(['😭', '😨', '💔'])}"
+        fail_messages = [
+            "失败了...",
+            "被反杀了！",
+            "任务失败！",
+            "翻车了！",
+            "被发现了！",
+            "计划败露！",
+        ]
+        msg = (
+            f"{random.choice(fail_messages)}\n"
+            f"{MessageSegment.image(await user_img(target))}"
+            f"目标：『{target_name}』\n"
+            f"结果：失败 {random.choice(['😭', '😨', '💔', '😵', '🤕'])}"
+        )
+
+    return Message(msg)
