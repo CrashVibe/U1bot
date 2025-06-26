@@ -75,16 +75,18 @@ async def _update(event: Event):
         )
     ]
 )
-async def _fishing(event: Event):
+async def _fishing(event: GroupMessageEvent | PrivateMessageEvent, bot: Bot):
     """钓鱼"""
     if isinstance(event, GroupMessageEvent) and not await get_switch_fish(event):
         await fishing.finish("钓鱼在本群处于关闭状态，请看菜单重新打开")
+
     user_id = event.get_user_id()
     fish = await choice(user_id=user_id)
-    if fish[2] and fish[3] is not None and fish[3] != 0:
-        await fishing.send(f"正在钓鱼…\n使用运气[{fish[3]}]加成")
-    else:
-        await fishing.send("正在钓鱼…")
+    await bot.set_msg_emoji_like(
+        message_id=event.message_id,
+        emoji_id="127881",
+    )
+
     fish_name = fish[0]
     fish_long = fish[1]
     sleep_time = random.randint(1, 6)
@@ -99,7 +101,6 @@ async def _fishing(event: Event):
         result = f"* 你钓到了一条 {get_quality(fish_name)} {fish_name}，长度为 {fish_long}cm！"
     await save_fish(user_id, fish_name, fish_long)
     await asyncio.sleep(sleep_time)
-    # result = "* 你钓了一整天，什么也没钓到，但是你的技术有所提升了！"
     await fishing.finish(result, reply_message=True)
 
 

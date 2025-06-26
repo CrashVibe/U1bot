@@ -107,7 +107,7 @@ class Config(BaseModel):
         "隐火鲑鱼",
     ]
 
-    fishing_limit: int = 30  # 钓鱼间隔 (s)
+    fishing_limit: int = 15  # 钓鱼间隔 (s)
     fishing_coin_name: str = "次元币"  # 货币名称
 
 
