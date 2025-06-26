@@ -1,4 +1,4 @@
-from nonebot import on_command, require
+from nonebot import on_fullmatch, require
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageSegment
 
 require("nonebot_plugin_orm")
@@ -8,7 +8,7 @@ from sqlalchemy import select
 from .models import WaifuRelationship
 from .utils import bbcode_to_png
 
-cp_list = on_command("本群CP", block=True)
+cp_list = on_fullmatch(("本群cp", "本群CP"), block=True)
 
 
 @cp_list.handle()
