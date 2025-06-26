@@ -155,16 +155,19 @@ async def get_medal_list(uid: int) -> list[dict]:
         return result["data"]["list"]
 
 
+# 优化后的API配置，基于测试结果重新排序
 API_CONFIGS = [
-    {
-        "name": "app.biliapi.net",
-        "url": "https://app.biliapi.net/x/v2/relation/followings",
-        "max_pages": 5,
-    },
     {
         "name": "biligame",
         "url": "https://line3-h5-mobile-api.biligame.com/game/center/h5/user/relationship/following_list",
-        "max_pages": 20,
+        "max_pages": 200,
+        "priority": 1,
+    },
+    {
+        "name": "app.biliapi.net", # 备用API，限制为250个
+        "url": "https://app.biliapi.net/x/v2/relation/followings",
+        "max_pages": 5,
+        "priority": 2,
     },
 ]
 
@@ -179,31 +182,75 @@ async def get_api_data(url: str, params: dict) -> dict:
 
 
 async def fetch_all_followings(uid: int, api_config: dict) -> list[int]:
-    """使用指定API获取完整关注列表"""
+    """使用指定API获取完整关注列表，优化版本"""
+    import asyncio
+
     followings = []
     page = 1
+    consecutive_failures = 0  # 连续失败次数
+    max_consecutive_failures = 3  # 最大允许连续失败次数
+
     while page <= api_config["max_pages"]:
         try:
             params = {"vmid": uid, "pn": page, "ps": PAGE_SIZE}
             result = await get_api_data(api_config["url"], params)
+
             if result["code"] != 0:
                 if page == 1:
-                    raise Exception(f"API错误: {result.get('message', '未知错误')}")
-                break
+                    logger.error(
+                        f"{api_config['name']} API第一页失败: {result.get('message', '未知错误')}"
+                    )
+                    break
+
+                consecutive_failures += 1
+                if consecutive_failures >= max_consecutive_failures:
+                    logger.warning(
+                        f"{api_config['name']} API连续失败{consecutive_failures}次，停止请求"
+                    )
+                    break
+
+                # 失败后才加延迟重试
+                await asyncio.sleep(1.0)
+                page += 1
+                continue
+
+            # 重置连续失败计数
+            consecutive_failures = 0
+
             page_list = result.get("data", {}).get("list", [])
             if not page_list:
+                logger.info(f"{api_config['name']} API第{page}页无数据，可能已获取完毕")
                 break
+
             page_followings = [int(user["mid"]) for user in page_list]
             followings.extend(page_followings)
-            logger.info(f"第 {page} 页获取 {len(page_followings)} 个关注")
+            logger.info(
+                f"{api_config['name']} API第{page}页获取{len(page_followings)}个关注"
+            )
+
+            # 当前页数据不满是最后一页
             if len(page_followings) < PAGE_SIZE:
+                logger.info(
+                    f"{api_config['name']} API第{page}页数据不满，认为已获取完毕"
+                )
                 break
+
             page += 1
+
         except Exception as e:
-            if page == 1:
-                raise e
-            logger.warning(f"第 {page} 页获取失败: {e}")
-            break
+            consecutive_failures += 1
+            logger.warning(f"{api_config['name']} API第{page}页异常: {e}")
+
+            if consecutive_failures >= max_consecutive_failures:
+                logger.error(
+                    f"{api_config['name']} API连续异常{consecutive_failures}次，停止请求"
+                )
+                break
+
+            # 异常后才加延迟
+            await asyncio.sleep(1.0)
+            page += 1
+
     return followings
 
 
@@ -237,20 +284,48 @@ async def get_user_basic_info(uid: int) -> dict:
 
 
 async def get_user_followings(uid: int) -> list[int]:
-    """获取用户关注列表"""
-    for api_config in API_CONFIGS:
+    """获取用户关注列表，优化版本"""
+    sorted_apis = sorted(API_CONFIGS, key=lambda x: x.get("priority", 999))
+
+    best_result = []
+    best_api_name = None
+
+    for api_config in sorted_apis:
         try:
-            logger.info(f"尝试使用 {api_config['name']} API")
+            logger.info(f"尝试使用 {api_config['name']} API获取用户{uid}的关注列表")
             followings = await fetch_all_followings(uid, api_config)
+
             if followings:
-                logger.info(
-                    f"{api_config['name']} API 成功获取 {len(followings)} 个关注"
-                )
-                return followings
+                logger.info(f"{api_config['name']} API成功获取{len(followings)}个关注")
+
+                if len(followings) > len(best_result):
+                    best_result = followings
+                    best_api_name = api_config["name"]
+
+                if api_config["name"] == "biligame" and len(followings) > 1000:
+                    logger.info(
+                        f"biligame API获取到{len(followings)}个关注，认为已获取完整列表"
+                    )
+                    break
+
+                if len(followings) < 500:
+                    logger.info(
+                        f"{api_config['name']} API获取数据较少，继续尝试其他API"
+                    )
+                    continue
+                else:
+                    break
+
         except Exception as e:
-            logger.warning(f"{api_config['name']} API 失败: {e}")
-    logger.error(f"所有API都失败，无法获取用户 {uid} 的关注列表")
-    return []
+            logger.warning(f"{api_config['name']} API失败: {e}")
+
+    # 记录最终统计信息
+    if best_result and best_api_name:
+        logger.info(f"最终选择{best_api_name} API的结果，获取{len(best_result)}个关注")
+    else:
+        logger.error(f"所有API都失败，无法获取用户{uid}的关注列表")
+
+    return best_result
 
 
 async def get_user_info(uid: int) -> dict:
