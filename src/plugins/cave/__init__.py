@@ -127,7 +127,10 @@ async def condition(event: MessageEvent, key: str) -> tuple[bool, str | None]:
     if not isinstance(event, PrivateMessageEvent):
         return False, "还是请来私聊我投稿罢~"
     if not key:
-        return False, "你输入了什么？一个......空气？\n请在投稿内容前加上“投稿”或“匿名投稿”"
+        return (
+            False,
+            "你输入了什么？一个......空气？\n请在投稿内容前加上“投稿”或“匿名投稿”",
+        )
     if len(key) < 6:
         return False, "太短了罢~\n投稿内容至少需要6个字符，不要吝啬你的字数哦~"
     return True, None
@@ -293,8 +296,14 @@ async def _(args: Message = CommandArg()):
     if not key:
         await cave_view.finish("请输入编号")
 
+    # 验证输入是否为有效的数字
+    try:
+        cave_id = int(key)
+    except ValueError:
+        await cave_view.finish("请输入有效的数字编号")
+
     async with get_session() as session:
-        stmt = select(cave_models).where(cave_models.id == int(key))
+        stmt = select(cave_models).where(cave_models.id == cave_id)
         result = await session.execute(stmt)
         cave = result.scalar_one_or_none()
 

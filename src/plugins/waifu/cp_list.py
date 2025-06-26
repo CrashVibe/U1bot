@@ -30,7 +30,8 @@ async def show_cp_list(bot: Bot, event: GroupMessageEvent):
         if not relationships:
             content += "暂无CP记录"
         else:
-            for relationship in relationships:
+            for relationship_tuple in relationships:
+                relationship = relationship_tuple[0]
                 user_id = relationship.user_id
                 partner_id = relationship.partner_id
 

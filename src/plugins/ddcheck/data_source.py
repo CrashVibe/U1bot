@@ -145,6 +145,13 @@ async def get_medal_list(uid: int) -> list[dict]:
         resp = await client.get(url, params=params, headers=HEADERS, cookies=cookies)
         cookies.update(resp.cookies)
         result = resp.json()
+
+        if "data" not in result:
+            raise KeyError(f"API响应中缺少 'data' 字段: {result}")
+
+        if "list" not in result["data"]:
+            return []
+
         return result["data"]["list"]
 
 
