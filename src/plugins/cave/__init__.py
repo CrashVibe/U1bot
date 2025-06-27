@@ -159,10 +159,9 @@ async def _(bot: Bot, event: MessageEvent):
         await session.commit()
         await session.refresh(caves)
 
-        result = f"[投稿成功]\n编号: {caves.id}\n"
-        result += "=" * 30 + "\n"
+        result = f"[投稿成功 #{caves.id}]\n"
         result += f"{caves.details}\n"
-        result += "=" * 30 + "\n"
+        result += "————————————\n"
         result += f"投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         result += f"消耗次元币: 200 | 余额: {remaining_coin:.1f}"
         for i in SUPERUSER_list:
@@ -197,10 +196,9 @@ async def _(bot: Bot, event: MessageEvent):
         await session.commit()
         await session.refresh(caves)
 
-        result = f"[匿名投稿成功]\n编号: {caves.id}\n"
-        result += "=" * 30 + "\n"
+        result = f"[匿名投稿成功 #{caves.id}]\n"
         result += f"{caves.details}\n"
-        result += "=" * 30 + "\n"
+        result += "————————————\n"
         result += f"投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         result += "匿名投稿会保存用户信息但其他用户无法看到作者\n"
         result += f"消耗次元币: 400 | 余额: {remaining_coin:.1f}"
@@ -281,12 +279,11 @@ async def _():
             "匿名用户" if random_cave.anonymous else f"用户{random_cave.user_id}"
         )
         result = f"[回声洞 #{random_cave.id}]\n"
-        result += "=" * 30 + "\n"
         result += f"{random_cave.details}\n"
-        result += "=" * 30 + "\n"
-        result += f"投稿人: {displayname}\n"
-        result += f"时间: {random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
+        result += "————————————\n"
+        result += f"投稿人：{displayname}\n"
+        result += f"时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        result += "\n私聊机器人可以投稿：\n投稿 [内容] | 匿名投稿 [内容]"
         await cave_main.finish(Message(result))
 
 
@@ -313,9 +310,8 @@ async def _(args: Message = CommandArg()):
         # 判断是否是匿名
         displayname = "匿名用户" if cave.anonymous else f"用户{cave.user_id}"
         result = f"[回声洞 #{cave.id}]\n"
-        result += "=" * 30 + "\n"
         result += f"{cave.details}\n"
-        result += "=" * 30 + "\n"
+        result += "————————————\n"
         result += f"投稿人: {displayname}\n"
         result += f"时间: {cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
@@ -334,10 +330,9 @@ async def _(bot: Bot, event: MessageEvent):
             "您的回声洞投稿记录:",
             *[
                 Message(
-                    f"编号: {i.id}\n"
-                    f"=" * 20 + "\n"
+                    f"[编号 #{i.id}]\n"
                     f"{i.details}\n"
-                    f"=" * 20 + "\n"
+                    f"————————————\n"
                     f"投稿时间: {i.time.strftime('%Y-%m-%d %H:%M:%S')}"
                 )
                 for i in all_caves
