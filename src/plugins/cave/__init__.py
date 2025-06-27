@@ -1,6 +1,6 @@
 import random
 
-from nonebot import get_driver, logger, on_command, on_fullmatch
+from nonebot import get_driver, logger, on_command
 from nonebot.adapters.onebot.v11 import (
     Bot,
     GroupMessageEvent,
@@ -28,21 +28,20 @@ __plugin_meta__ = PluginMetadata(
 匿名投稿 (消耗400次元币)
 查看回声洞记录
 删除 [序号]
-查看 [序号]
+回声洞 [序号]
 
 示例:
 投稿 今天天气真不错
 匿名投稿 分享一个小秘密
 删除 1
-查看 1""",
+回声洞 1""",
 )
 
 
-cave_main = on_fullmatch("回声洞", block=True)
+cave_main = on_command("回声洞", block=True)
 cave_add = on_command("投稿", aliases={"回声洞投稿"}, block=True)
 cave_am_add = on_command("匿名投稿", aliases={"回声洞匿名投稿"}, block=True)
 cave_history = on_command("查看回声洞记录", aliases={"回声洞记录"}, block=True)
-cave_view = on_command("查看", block=True)
 cave_del = on_command("删除", block=True)
 
 cave_update = on_command("更新回声洞", permission=SUPERUSER, block=True)
@@ -265,57 +264,52 @@ async def _(bot: Bot, event: MessageEvent):
 
 
 @cave_main.handle()
-async def _():
-    async with get_session() as session:
-        stmt = select(cave_models)
-        result = await session.execute(stmt)
-        all_caves = result.scalars().all()
-
-        if not all_caves:
-            await cave_main.finish("回声洞暂时还没有投稿呢")
-
-        random_cave = random.choice(all_caves)
-        displayname = (
-            "匿名用户" if random_cave.anonymous else f"用户{random_cave.user_id}"
-        )
-        result = f"[回声洞 #{random_cave.id}]\n"
-        result += f"{random_cave.details}\n"
-        result += "————————————\n"
-        result += f"投稿人：{displayname}\n"
-        result += f"时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "\n私聊机器人可以投稿：\n投稿 [内容] | 匿名投稿 [内容]"
-        await cave_main.finish(Message(result))
-
-
-@cave_view.handle()
 async def _(args: Message = CommandArg()):
     key = str(args).strip()
-    if not key:
-        await cave_view.finish("请输入编号")
-
-    # 验证输入是否为有效的数字
-    try:
-        cave_id = int(key)
-    except ValueError:
-        await cave_view.finish("请输入有效的数字编号")
 
     async with get_session() as session:
-        stmt = select(cave_models).where(cave_models.id == cave_id)
-        result = await session.execute(stmt)
-        cave = result.scalar_one_or_none()
+        if not key:
+            stmt = select(cave_models)
+            result = await session.execute(stmt)
+            all_caves = result.scalars().all()
 
-        if cave is None:
-            await cave_view.finish("没有这个序号的投稿")
+            if not all_caves:
+                await cave_main.finish("回声洞暂时还没有投稿呢")
 
-        # 判断是否是匿名
-        displayname = "匿名用户" if cave.anonymous else f"用户{cave.user_id}"
-        result = f"[回声洞 #{cave.id}]\n"
-        result += f"{cave.details}\n"
-        result += "————————————\n"
-        result += f"投稿人: {displayname}\n"
-        result += f"时间: {cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
-        await cave_view.finish(Message(result))
+            random_cave = random.choice(all_caves)
+            displayname = (
+                "匿名用户" if random_cave.anonymous else f"用户{random_cave.user_id}"
+            )
+            result = f"[回声洞 #{random_cave.id}]\n"
+            result += f"{random_cave.details}\n"
+            result += "————————————\n"
+            result += f"投稿人：{displayname}\n"
+            result += f"时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            result += "\n私聊机器人可以投稿：\n投稿 [内容] | 匿名投稿 [内容]"
+            await cave_main.finish(Message(result))
+        else:
+            # 验证输入是否为有效的数字
+            try:
+                cave_id = int(key)
+            except ValueError:
+                await cave_main.finish("请输入有效的数字编号")
+
+            stmt = select(cave_models).where(cave_models.id == cave_id)
+            result = await session.execute(stmt)
+            cave = result.scalar_one_or_none()
+
+            if cave is None:
+                await cave_main.finish("没有这个序号的投稿")
+
+            # 判断是否是匿名
+            displayname = "匿名用户" if cave.anonymous else f"用户{cave.user_id}"
+            result = f"[回声洞 #{cave.id}]\n"
+            result += f"{cave.details}\n"
+            result += "————————————\n"
+            result += f"投稿人: {displayname}\n"
+            result += f"时间: {cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
+            await cave_main.finish(Message(result))
 
 
 @cave_history.handle()
