@@ -54,17 +54,20 @@ app = nonebot.get_asgi()
 driver = nonebot.get_driver()
 driver.register_adapter(ONEBOT_V11Adapter)
 
+
 @driver.on_startup
 async def connect_db():
     from U1.database import connect
 
     await connect()
 
+
 @driver.on_shutdown
 async def disconnect_db():
     from U1.database import disconnect
 
     await disconnect()
+
 
 nonebot.load_from_toml("pyproject.toml")
 from nonebot.message import event_preprocessor
@@ -78,10 +81,11 @@ async def get_channel(group_id: str):
 
 @event_preprocessor
 async def _(bot: Bot, event: GroupMessageEvent):
-    "防止机器人自言自语"
     bot_qqid = bot.self_id
+
     if event.to_me:
         return
+
     channel = await get_channel(str(event.group_id))
     if channel is None:
         for _ in range(3):
@@ -89,10 +93,21 @@ async def _(bot: Bot, event: GroupMessageEvent):
             if channel is not None:
                 break  # 重试直到找到频道
             await asyncio.sleep(0.5)
+
     if channel is None:
         raise IgnoredException("未找到频道，忽略")
+
     if channel.assignee != bot_qqid:
-        raise IgnoredException("机器人不是频道指定的机器人，忽略")
+        from nonebot import get_bots
+
+        available_bots = get_bots()
+
+        if channel.assignee not in available_bots:
+            logger.warning(
+                f"指定机器人 {channel.assignee} 不在线，临时使用当前机器人 {bot_qqid}"
+            )
+        else:
+            raise IgnoredException("机器人不是频道指定的机器人，忽略")
 
 
 if __name__ == "__main__":
