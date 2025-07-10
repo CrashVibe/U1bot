@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from nonebot import on_fullmatch, on_startswith
 from nonebot.adapters import Bot
+from nonebot.adapters.milky import Message, MessageSegment
 from nonebot.adapters.milky.event import GroupMessageEvent
 
 from . import scheduler
@@ -51,7 +52,14 @@ async def _(bot: Bot, event: GroupMessageEvent):
     uid = event.data.sender_id
     gid = event.data.peer_id
 
-    await morning.finish(await get_morning_msg(uid, gid), reply_message=True)
+    await morning.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                await get_morning_msg(uid, gid),
+            ],
+        )
+    )
 
 
 @night.handle()
@@ -60,7 +68,14 @@ async def _(bot: Bot, event: GroupMessageEvent):
     uid = event.data.sender_id
     gid = event.data.peer_id
 
-    await night.finish(await get_night_msg(uid, gid), reply_message=True)
+    await night.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                await get_night_msg(uid, gid),
+            ],
+        )
+    )
 
 
 # 早晚安大统计
@@ -102,7 +117,14 @@ async def _(bot: Bot, event: GroupMessageEvent):
         f"╚═══════════"
     )
 
-    await statistics.finish(msg, reply_message=True)
+    await statistics.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                MessageSegment.text(msg),
+            ],
+        )
+    )
 
 
 # 我的作息
@@ -117,7 +139,14 @@ async def _(bot: Bot, event: GroupMessageEvent):
     user_data = await get_weekly_sleep_data(uid)
 
     if user_data is None:
-        await my_sleep.finish("未找到你的作息数据呢......", reply_message=True)
+        await my_sleep.finish(
+            Message(
+                [
+                    MessageSegment.reply(event.data.message_seq),
+                    MessageSegment.text("未找到你的作息数据呢......"),
+                ],
+            )
+        )
 
     today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y年%m月%d日")
 
@@ -159,4 +188,11 @@ async def _(bot: Bot, event: GroupMessageEvent):
         f"╚═══════════"
     )
 
-    await my_sleep.finish(msg, reply_message=True)
+    await my_sleep.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                MessageSegment.text(msg),
+            ],
+        )
+    )

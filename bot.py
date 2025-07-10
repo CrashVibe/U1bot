@@ -51,7 +51,6 @@ from nonebot.adapters.milky.event import GroupMessageEvent
 from nonebot.exception import IgnoredException
 
 nonebot.init()
-app = nonebot.get_asgi()
 driver = nonebot.get_driver()
 driver.register_adapter(MilkyAdapter)
 

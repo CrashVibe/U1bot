@@ -105,14 +105,29 @@ async def _fishing(event: GroupMessageEvent | FriendMessageEvent, bot: Bot):
         result = f"* 你钓到了一条 {get_quality(fish_name)} {fish_name}，长度为 {fish_long}cm！"
     await save_fish(user_id, fish_name, fish_long)
     await asyncio.sleep(sleep_time)
-    await fishing.finish(result, reply_message=True)
+    await fishing.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                MessageSegment.text(result),
+            ],
+        ),
+    )
 
 
 @stats.handle()
-async def _stats(event: Event):
+async def _stats(event: MessageEvent):
     """统计信息"""
     user_id = event.get_user_id()
-    await stats.finish(await get_stats(user_id), reply_message=True)
+
+    await stats.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                MessageSegment.text(await get_stats(user_id)),
+            ],
+        )
+    )
 
 
 @backpack.handle()
@@ -141,24 +156,52 @@ async def _backpack(bot: Bot, event: MessageEvent):
 
 
 @sell.handle()
-async def _sell(event: Event, arg: Message = CommandArg()):
+async def _sell(event: MessageEvent, arg: Message = CommandArg()):
     """卖鱼"""
     msg = arg.extract_plain_text()
     user_id = event.get_user_id()
     if msg == "":
         await sell.finish("请输入要卖出的鱼的名字，如：卖鱼 小鱼")
     if msg == "全部":
-        await sell.finish(await sell_all_fish(user_id), reply_message=True)
+        await sell.finish(
+            Message(
+                [
+                    MessageSegment.reply(event.data.message_seq),
+                    MessageSegment.text(await sell_all_fish(user_id)),
+                ],
+            )
+        )
     if msg in fish_quality.keys():  # 判断是否是为品质
-        await sell.finish(await sell_quality_fish(user_id, msg), reply_message=True)
-    await sell.finish(await sell_fish(user_id, msg), reply_message=True)
+        await sell.finish(
+            Message(
+                [
+                    MessageSegment.reply(event.data.message_seq),
+                    MessageSegment.text(await sell_quality_fish(user_id, msg)),
+                ],
+            )
+        )
+    await sell.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                MessageSegment.text(await sell_fish(user_id, msg)),
+            ],
+        )
+    )
 
 
 @balance.handle()
-async def _balance(event: Event):
+async def _balance(event: MessageEvent):
     """余额"""
     user_id = event.get_user_id()
-    await balance.finish(await get_balance(user_id), reply_message=True)
+    await balance.finish(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                MessageSegment.text(await get_balance(user_id)),
+            ],
+        )
+    )
 
 
 @switch.handle()
