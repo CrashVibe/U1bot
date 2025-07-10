@@ -45,14 +45,15 @@ logger.add(
 )
 
 
-from nonebot.adapters.onebot.v11 import Adapter as ONEBOT_V11Adapter
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
+from nonebot.adapters.milky import Adapter as MilkyAdapter
+from nonebot.adapters.milky import Bot
+from nonebot.adapters.milky.event import GroupMessageEvent
 from nonebot.exception import IgnoredException
 
 nonebot.init()
 app = nonebot.get_asgi()
 driver = nonebot.get_driver()
-driver.register_adapter(ONEBOT_V11Adapter)
+driver.register_adapter(MilkyAdapter)
 
 
 @driver.on_startup
@@ -86,10 +87,10 @@ async def _(bot: Bot, event: GroupMessageEvent):
     if event.to_me:
         return
 
-    channel = await get_channel(str(event.group_id))
+    channel = await get_channel(str(event.data.peer_id))
     if channel is None:
         for _ in range(3):
-            channel = await get_channel(str(event.group_id))
+            channel = await get_channel(str(event.data.peer_id))
             if channel is not None:
                 break  # 重试直到找到频道
             await asyncio.sleep(0.5)

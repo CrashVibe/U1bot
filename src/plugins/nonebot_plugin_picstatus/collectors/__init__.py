@@ -3,23 +3,17 @@ import importlib
 import time
 from abc import abstractmethod
 from collections import deque
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Deque,
-    Dict,
     Generic,
-    Optional,
-    Type,
     TypeVar,
-    Union,
 )
-from typing_extensions import override
 
 from nonebot import logger
 from nonebot_plugin_apscheduler import scheduler
+from typing_extensions import override
 
 from ..config import config
 
@@ -57,7 +51,7 @@ class BaseNormalCollector(Collector[T, T], Generic[T]):
 class BaseFirstTimeCollector(Collector[T, T], Generic[T]):
     def __init__(self) -> None:
         super().__init__()
-        self._cached: Union[T, Undefined] = Undefined()
+        self._cached: T | Undefined = Undefined()
 
     @override
     async def get(self) -> T:
@@ -68,13 +62,13 @@ class BaseFirstTimeCollector(Collector[T, T], Generic[T]):
         return data
 
 
-class BasePeriodicCollector(Collector[T, Deque[T]], Generic[T]):
+class BasePeriodicCollector(Collector[T, deque[T]], Generic[T]):
     def __init__(self, size: int = config.ps_default_collect_cache_size) -> None:
         super().__init__()
         self.data = deque(maxlen=size)
 
     @override
-    async def get(self) -> Deque[T]:
+    async def get(self) -> deque[T]:
         return self.data
 
     async def collect(self):
@@ -88,12 +82,12 @@ class BasePeriodicCollector(Collector[T, Deque[T]], Generic[T]):
             self.data.append(data)
 
 
-registered_collectors: Dict[str, Type[Collector]] = {}
-enabled_collectors: Dict[str, Collector] = {}
+registered_collectors: dict[str, type[Collector]] = {}
+enabled_collectors: dict[str, Collector] = {}
 
 
 def collector(name: str):
-    def deco(cls: Type[TC]) -> Type[TC]:
+    def deco(cls: type[TC]) -> type[TC]:
         if name in registered_collectors:
             raise ValueError(f"Collector {name} already exists")
         registered_collectors[name] = cls
@@ -120,7 +114,7 @@ async def enable_collectors(*names: str):
     await init_first_time_collectors()
 
 
-def functional_collector(cls: Type[Collector], name: Optional[str] = None):
+def functional_collector(cls: type[Collector], name: str | None = None):
     def deco(func: TCF) -> TCF:
         collector_name = name or func.__name__
         if not collector_name:
@@ -136,22 +130,22 @@ def functional_collector(cls: Type[Collector], name: Optional[str] = None):
     return deco
 
 
-def normal_collector(name: Optional[str] = None):
+def normal_collector(name: str | None = None):
     return functional_collector(BaseNormalCollector, name)
 
 
-def first_time_collector(name: Optional[str] = None):
+def first_time_collector(name: str | None = None):
     return functional_collector(BaseFirstTimeCollector, name)
 
 
-def periodic_collector(name: Optional[str] = None):
+def periodic_collector(name: str | None = None):
     return functional_collector(BasePeriodicCollector, name)
 
 
 class TimeBasedCounterCollector(BasePeriodicCollector[R], Generic[T, R]):
     def __init__(self, size: int = config.ps_default_collect_cache_size) -> None:
         super().__init__(size)
-        self.last_obj: Union[Undefined, T] = Undefined()
+        self.last_obj: Undefined | T = Undefined()
         self.last_time: float = 0
 
     @abstractmethod
@@ -174,7 +168,7 @@ class TimeBasedCounterCollector(BasePeriodicCollector[R], Generic[T, R]):
         return await self._calc(past, self.last_obj, time_passed)
 
 
-async def collect_all() -> Dict[str, Any]:
+async def collect_all() -> dict[str, Any]:
     async def get(name: str):
         return name, await enabled_collectors[name].get()
 

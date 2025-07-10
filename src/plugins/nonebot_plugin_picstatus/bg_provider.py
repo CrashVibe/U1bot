@@ -189,8 +189,8 @@ class BgPreloader:
             self.start_preload(create_when_full=True)
             if self.tasks:
                 await self._wait_signal()
-            if not self.backgrounds:
-                raise RuntimeError("Failed to wait background")
+        if not self.backgrounds:
+            raise RuntimeError("Failed to wait background")
         bg = self.backgrounds.pop(0)
         self.start_preload()
         return bg

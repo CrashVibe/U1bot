@@ -1,6 +1,5 @@
 import asyncio
 from contextlib import suppress
-from typing import Optional
 
 from nonebot import logger, on_command
 from nonebot.adapters import Bot as BaseBot, Event as BaseEvent, Message as BaseMessage
@@ -56,17 +55,15 @@ async def _msg_pic(msg: UniMsg) -> BgData | None:
         current_matcher.get().state,
         img,
     )
-    if not data:
-        return None
-    return BgData(data=data, mime=img.mimetype or "image")
+    return BgData(data=data, mime=img.mimetype or "image") if data else None
 
 
-def MsgPic():  # noqa: N802
+def MsgPic():
     return Depends(_msg_pic)
 
 
 @stat_matcher.handle()
-async def _(bot: BaseBot, event: BaseEvent, msg_pic: Optional[BgData] = MsgPic()):
+async def _(bot: BaseBot, event: BaseEvent, msg_pic: BgData | None = MsgPic()):
     with suppress(Exception):
         await cache_bot_info(bot, event)
 

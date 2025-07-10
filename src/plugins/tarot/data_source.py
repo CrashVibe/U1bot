@@ -5,11 +5,12 @@ from pathlib import Path
 
 import aiofiles
 from nonebot.adapters import Event
-from nonebot.adapters.onebot.v11 import Bot, Message, MessageSegment
-from nonebot.adapters.onebot.v11.event import (
+from nonebot.adapters.milky import Bot, Message, MessageSegment
+from nonebot.adapters.milky.event import (
+    FriendMessageEvent,
     GroupMessageEvent,
-    PrivateMessageEvent,
 )
+from nonebot.adapters.milky.message import OutgoingForwardedMessage
 from nonebot.matcher import Matcher
 from PIL import Image
 
@@ -111,7 +112,8 @@ class Tarot:
         )
 
         # 4. Genrate message
-        chain = []
+        chain: list[Message] = []
+        fowardmsg = None
         for i, card_info in enumerate(cards_info_list):
             # Select the #i tarot
             msg_header = MessageSegment.text(
@@ -123,10 +125,25 @@ class Tarot:
                 await matcher.finish(msg_body)
 
             if (
-                isinstance(event, GroupMessageEvent | PrivateMessageEvent)
+                isinstance(event, GroupMessageEvent | FriendMessageEvent)
             ) and self.is_chain_reply:
-                chain = chain_reply(bot, chain, msg_header + msg_body)
-            elif isinstance(event, PrivateMessageEvent):
+                combined_msg = msg_header + msg_body
+                chain.append(combined_msg)
+                segments: list[MessageSegment] = []
+                for msg in chain:
+                    if isinstance(msg, Message):
+                        segments.extend(msg)
+                    else:
+                        segments.append(msg)
+                fowardmsg = [
+                    OutgoingForwardedMessage(
+                        name=next(iter(tarot_config.nickname)),
+                        user_id=int(bot.self_id),
+                        segments=[msg_seq],
+                    )
+                    for msg_seq in segments
+                ]
+            elif isinstance(event, FriendMessageEvent):
                 await matcher.send(msg_header + msg_body)
             elif isinstance(event, GroupMessageEvent):
                 await matcher.send(msg_header + msg_body)
@@ -135,15 +152,8 @@ class Tarot:
             else:
                 raise EventNotSupport
 
-        if self.is_chain_reply:
-            if isinstance(event, PrivateMessageEvent):
-                await bot.send_private_forward_msg(
-                    user_id=int(event.get_user_id()), messages=chain
-                )
-            elif isinstance(event, GroupMessageEvent):
-                await bot.send_group_forward_msg(
-                    group_id=event.group_id, messages=chain
-                )
+        if self.is_chain_reply and fowardmsg is not None:
+            await matcher.finish(MessageSegment.forward(messages=fowardmsg))
 
     async def onetime_divine(self) -> MessageSegment | str | Message:
         """
@@ -251,8 +261,15 @@ class Tarot:
 
         buf = BytesIO()
         img.save(buf, format="png")
+        buf.seek(0)
 
-        return True, msg + MessageSegment.image(buf)
+        # Convert BytesIO to base64 string for image
+        import base64
+
+        img_b64 = base64.b64encode(buf.getvalue()).decode()
+        img_url = f"data:image/png;base64,{img_b64}"
+
+        return True, Message([msg, MessageSegment.image(img_url)])
 
 
 tarot_manager = Tarot()

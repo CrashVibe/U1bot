@@ -1,10 +1,13 @@
 # ruff: noqa: E402
 
+import asyncio
+
 from nonebot import get_driver
 from nonebot.plugin import PluginMetadata, inherit_supported_adapters, require
 
 require("nonebot_plugin_alconna")
 require("nonebot_plugin_waiter")
+require("nonebot_plugin_localstore")
 require("nonebot_plugin_htmlrender")
 
 from . import interaction as interaction
@@ -13,7 +16,12 @@ from .data_source import login, registered_searcher
 from .interaction import load_commands
 
 driver = get_driver()
-driver.on_startup(login)
+
+
+@driver.on_startup
+async def _():
+    asyncio.create_task(login())
+
 
 load_commands()
 
@@ -29,7 +37,7 @@ auto_resolve_tip = (
     "▶ Bot 会自动解析你发送的网易云链接\n" if config.ncm_auto_resolve else ""
 )
 
-__version__ = "1.1.5"
+__version__ = "1.2.6"
 __plugin_meta__ = PluginMetadata(
     name="MultiNCM",
     description="网易云多选点歌",

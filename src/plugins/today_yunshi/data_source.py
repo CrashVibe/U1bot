@@ -38,10 +38,11 @@ async def get_user_luck_star(user_id: str) -> int | None:
             ):
                 async with aiofiles.open(luckpath, encoding="utf-8") as f:
                     luckdata = json.loads(await f.read())
-                    luck_star_num = (
-                        luckdata.get(str(luck.luckid), {}).get("星级", "").count("★")
+                    return (
+                        luckdata.get(str(luck.luckid), {})
+                        .get("星级", "")
+                        .count("★")
                     )
-                    return luck_star_num
     except (OSError, json.JSONDecodeError) as e:
         print(f"Error reading or parsing luck data: {e}")
 
@@ -69,8 +70,7 @@ async def get_user_luck_info(user_id: str) -> dict | None:
             ):
                 async with aiofiles.open(luckpath, encoding="utf-8") as f:
                     luckdata = json.loads(await f.read())
-                    luck_info = luckdata.get(str(luck.luckid))
-                    if luck_info:
+                    if luck_info := luckdata.get(str(luck.luckid)):
                         return {
                             "luckid": luck.luckid,
                             "star_count": luck_info.get("星级", "").count("★"),
@@ -123,11 +123,7 @@ async def luck_result(user_id: str, focus: bool = False) -> str:
         ):
             # 如果是今天的数据则返回今天的数据
             r = str(member_model.luckid)
-            result_text = (
-                f"----\n{luckdata[r]['运势']}\n{luckdata[r]['星级']}\n"
-                f"{luckdata[r]['签文']}\n{luckdata[r]['解签']}\n----"
-            )
-            return result_text
+            return f"----\n{luckdata[r]['运势']}\n{luckdata[r]['星级']}\n{luckdata[r]['签文']}\n{luckdata[r]['解签']}\n----"
         else:
             # 如果不是今天的数据则随机运势
             result_text, luckid = random_luck(luckdata)

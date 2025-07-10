@@ -1,23 +1,25 @@
 import random
 
 from nonebot import get_driver, logger, on_command
-from nonebot.adapters.onebot.v11 import (
+from nonebot.adapters.milky import (
     Bot,
-    GroupMessageEvent,
     Message,
     MessageEvent,
-    PrivateMessageEvent,
+    MessageSegment,
 )
-from nonebot.adapters.onebot.v11.helpers import extract_image_urls
+from nonebot.adapters.milky.event import FriendMessageEvent
+from nonebot.adapters.milky.message import OutgoingForwardedMessage
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_orm import get_session
 from sqlalchemy import delete, select
 
+from U1.utils.utils import extract_image_urls
+
 from ..coin.api import subtract_coin
 from .models import cave_models
-from .tool import is_image_message
+from .tool import process_image_message
 
 nickname_list = list(get_driver().config.nickname)
 Bot_NICKNAME = nickname_list[0] if nickname_list else "bot"
@@ -123,7 +125,7 @@ async def condition(event: MessageEvent, key: str) -> tuple[bool, str | None]:
     urllist = extract_image_urls(event.get_message())
     if len(urllist) > 1:
         return False, "呃，投稿只能包含一张图片诶~\n再斟酌一下你的投稿内容吧~"
-    if not isinstance(event, PrivateMessageEvent):
+    if not isinstance(event, FriendMessageEvent):
         return False, "还是请来私聊我投稿罢~"
     if not key:
         return (
@@ -137,23 +139,23 @@ async def condition(event: MessageEvent, key: str) -> tuple[bool, str | None]:
 
 @cave_add.handle()
 async def _(bot: Bot, event: MessageEvent):
-    is_image = await is_image_message(event)
-    details = is_image[1] if is_image[0] else str(event.get_message())
+    has_image, clean_text, base64_images = await process_image_message(event)
+    details = clean_text if has_image else str(event.get_message())
     details = details.replace("投稿", "", 1).strip()
     result = await condition(event, details)
     if result[0] is False:  # 审核
         await cave_add.finish(result[1])
 
     # 扣除次元币
-    user_id = str(event.user_id)
-    success, remaining_coin = await subtract_coin(user_id, 200)
+    user_id = event.data.sender_id
+    success, remaining_coin = await subtract_coin(str(user_id), 200)
     if not success:
         await cave_add.finish(
             f"投稿需要消耗 200 次元币，您当前只有 {remaining_coin:.1f} 次元币，余额不足！"
         )
 
     async with get_session() as session:
-        caves = cave_models(details=details, user_id=event.user_id)
+        caves = cave_models(details=details, user_id=user_id, img_base64=base64_images)
         session.add(caves)
         await session.commit()
         await session.refresh(caves)
@@ -164,7 +166,7 @@ async def _(bot: Bot, event: MessageEvent):
         result += f"投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         result += f"消耗次元币: 200 | 余额: {remaining_coin:.1f}"
         for i in SUPERUSER_list:
-            await bot.send_private_msg(
+            await bot.send_private_message(
                 user_id=int(i),
                 message=Message(f"来自用户{event.get_user_id()}\n{result}"),
             )
@@ -174,23 +176,23 @@ async def _(bot: Bot, event: MessageEvent):
 @cave_am_add.handle()
 async def _(bot: Bot, event: MessageEvent):
     "匿名发布回声洞"
-    is_image = await is_image_message(event)
-    details = is_image[1] if is_image[0] else str(event.get_message())
+    has_image, clean_text, base64_images = await process_image_message(event)
+    details = clean_text if has_image else str(event.get_message())
     details = details.replace("匿名投稿", "", 1).strip()
     result = await condition(event, details)
     if result[0] is False:  # 审核
         await cave_am_add.finish(result[1])
 
     # 扣除次元币
-    user_id = str(event.user_id)
-    success, remaining_coin = await subtract_coin(user_id, 400)
+    user_id = event.data.sender_id
+    success, remaining_coin = await subtract_coin(str(user_id), 400)
     if not success:
         await cave_am_add.finish(
             f"匿名投稿需要消耗 400 次元币，您当前只有 {remaining_coin:.1f} 次元币，余额不足！"
         )
 
     async with get_session() as session:
-        caves = cave_models(details=details, user_id=event.user_id, anonymous=True)
+        caves = cave_models(details=details, user_id=user_id, anonymous=True, img_base64=base64_images)
         session.add(caves)
         await session.commit()
         await session.refresh(caves)
@@ -202,7 +204,7 @@ async def _(bot: Bot, event: MessageEvent):
         result += "匿名投稿会保存用户信息但其他用户无法看到作者\n"
         result += f"消耗次元币: 400 | 余额: {remaining_coin:.1f}"
         for i in SUPERUSER_list:
-            await bot.send_private_msg(
+            await bot.send_private_message(
                 user_id=int(i),
                 message=Message(f"来自用户{event.get_user_id()}\n{result}"),
             )
@@ -230,9 +232,9 @@ async def _(bot: Bot, event: MessageEvent):
             await cave_del.finish("没有这个序号的投稿")
 
         # 判断是否是超级用户或者是投稿人
-        if str(event.user_id) in SUPERUSER_list:
+        if str(event.data.sender_id) in SUPERUSER_list:
             try:
-                await bot.send_private_msg(
+                await bot.send_private_message(
                     user_id=data.user_id,
                     message=Message(
                         f"您的投稿 #{key} 已被管理员删除\n内容: {data.details}\n删除原因: {reason}"
@@ -243,7 +245,7 @@ async def _(bot: Bot, event: MessageEvent):
                     f"回声洞删除投稿私聊通知失败，投稿人 id：{data.user_id}"
                 )
                 await cave_del.send("删除失败，私聊通知失败")
-        elif event.user_id == data.user_id:
+        elif event.data.sender_id == data.user_id:
             result_content = data.details
             await session.delete(data)
             await session.commit()
@@ -286,7 +288,6 @@ async def _(args: Message = CommandArg()):
             result += f"投稿人：{displayname}\n"
             result += f"时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
             result += "\n私聊机器人可以投稿：\n投稿 [内容] | 匿名投稿 [内容]"
-            await cave_main.finish(Message(result))
         else:
             # 验证输入是否为有效的数字
             try:
@@ -309,62 +310,44 @@ async def _(args: Message = CommandArg()):
             result += f"投稿人: {displayname}\n"
             result += f"时间: {cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
             result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
-            await cave_main.finish(Message(result))
+
+        await cave_main.finish(Message(result))
 
 
 @cave_history.handle()
 async def _(bot: Bot, event: MessageEvent):
     # 查询 userid 写所有数据
     async with get_session() as session:
-        stmt = select(cave_models).where(cave_models.user_id == event.user_id)
+        stmt = select(cave_models).where(cave_models.user_id == event.data.sender_id)
         result = await session.execute(stmt)
         all_caves = result.scalars().all()
 
-        msg_list = [
-            "您的回声洞投稿记录:",
-            *[
-                Message(
-                    f"[编号 #{i.id}]\n"
-                    f"{i.details}\n"
-                    f"————————————\n"
-                    f"投稿时间: {i.time.strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-                for i in all_caves
-            ],
+        if not all_caves:
+            await cave_history.finish("您还没有任何投稿记录")
+
+        # 构造转发消息
+        messages: list[MessageSegment] = [MessageSegment.text("您的回声洞投稿记录:")]
+
+        # 添加每个投稿记录
+        for i in all_caves:
+            msg_content = (
+                f"[编号 #{i.id}]\n"
+                f"{i.details}\n"
+                f"————————————\n"
+                f"投稿时间: {i.time.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            messages.append(MessageSegment.text(msg_content))
+
+        forward_msgs = [
+            OutgoingForwardedMessage(
+                name=Bot_NICKNAME,
+                user_id=int(bot.self_id),
+                segments=[messages_seg],
+            )
+            for messages_seg in messages
         ]
-        await send_forward_msg(bot, event, Bot_NICKNAME, bot.self_id, msg_list)
 
-
-async def send_forward_msg(
-    bot: Bot,
-    event: MessageEvent,
-    name: str,
-    uin: str,
-    msgs: list,
-) -> dict:
-    """
-    发送转发消息的异步函数。
-
-    参数：
-        bot (Bot): 机器人实例
-        event (MessageEvent): 消息事件
-        name (str): 转发消息的名称
-        uin (str): 转发消息的 UIN
-        msgs (list): 转发的消息列表
-
-    返回：
-        dict: API 调用结果
-    """
-
-    def to_json(msg: Message):
-        return {"type": "node", "data": {"name": name, "uin": uin, "content": msg}}
-
-    messages = [to_json(msg) for msg in msgs]
-    if isinstance(event, GroupMessageEvent):
-        return await bot.send_group_forward_msg(
-            group_id=event.group_id, messages=messages
-        )
-    return await bot.send_private_forward_msg(user_id=event.user_id, messages=messages)
+        await cave_history.finish(MessageSegment.forward(forward_msgs))
 
 
 def extract_deletion_reason(text):

@@ -1,13 +1,13 @@
 import re
 from dataclasses import dataclass
-from typing import Annotated, TypeAlias
+from typing import Annotated, Optional, Union
+from typing_extensions import TypeAlias
 
 from cachetools import TTLCache
 from cookit import flatten, queued
 from cookit.loguru import warning_suppress
 from httpx import AsyncClient
-from nonebot.adapters import Bot as BaseBot
-from nonebot.adapters import Message as BaseMessage
+from nonebot.adapters import Bot as BaseBot, Message as BaseMessage
 from nonebot.consts import REGEX_MATCHED
 from nonebot.matcher import Matcher
 from nonebot.params import Depends
@@ -28,9 +28,10 @@ from ..data_source import (
 from ..utils import is_song_card_supported
 from .cache import get_cache
 
-ExpectedTypeType: TypeAlias = (
-    type[GeneralSongOrPlaylist] | tuple[type[GeneralSongOrPlaylist], ...]
-)
+ExpectedTypeType: TypeAlias = Union[
+    type[GeneralSongOrPlaylist],
+    tuple[type[GeneralSongOrPlaylist], ...],
+]
 
 
 resolved_cache: TTLCache[int, "ResolveCache"] = TTLCache(
@@ -61,7 +62,7 @@ async def resolve_from_link_params_cool_down(link_type: str, link_id: int):
 
 def check_is_expected_type(
     item_type: str,
-    expected_type: ExpectedTypeType | None = None,
+    expected_type: Optional[ExpectedTypeType] = None,
 ) -> bool:
     if not expected_type:
         return True
@@ -76,8 +77,8 @@ def check_is_expected_type(
 
 def extract_song_card_hyper(
     msg: UniMessage,
-    bot: BaseBot | None = None,
-) -> Hyper | None:
+    bot: Optional[BaseBot] = None,
+) -> Optional[Hyper]:
     if (Hyper in msg) and is_song_card_supported(bot):
         return msg[Hyper, 0]
     return None
@@ -85,7 +86,7 @@ def extract_song_card_hyper(
 
 async def resolve_short_url(
     suffix: str,
-    expected_type: ExpectedTypeType | None = None,
+    expected_type: Optional[ExpectedTypeType] = None,
     use_cool_down: bool = False,
 ) -> GeneralSongOrPlaylist:
     async with AsyncClient(base_url=SHORT_URL_BASE) as client:
@@ -93,7 +94,8 @@ async def resolve_short_url(
 
         if resp.status_code // 100 != 3:
             raise ValueError(
-                f"Short url {suffix} returned invalid status code {resp.status_code}",
+                f"Short url {suffix} "
+                f"returned invalid status code {resp.status_code}",
             )
 
         location = resp.headers.get("Location")
@@ -113,9 +115,9 @@ async def resolve_short_url(
 
 async def resolve_from_matched(
     matched: re.Match[str],
-    expected_type: ExpectedTypeType | None = None,
+    expected_type: Optional[ExpectedTypeType] = None,
     use_cool_down: bool = False,
-) -> GeneralSongOrPlaylist | None:
+) -> Optional[GeneralSongOrPlaylist]:
     groups = matched.groupdict()
 
     if "suffix" in groups:
@@ -143,9 +145,9 @@ async def resolve_from_matched(
 
 async def resolve_from_plaintext(
     text: str,
-    expected_type: ExpectedTypeType | None = None,
+    expected_type: Optional[ExpectedTypeType] = None,
     use_cool_down: bool = False,
-) -> GeneralSongOrPlaylist | None:
+) -> Optional[GeneralSongOrPlaylist]:
     for regex in (SHORT_URL_REGEX, URL_REGEX):
         if m := re.search(regex, text, re.IGNORECASE):
             return await resolve_from_matched(m, expected_type, use_cool_down)
@@ -155,9 +157,9 @@ async def resolve_from_plaintext(
 async def resolve_from_card(
     card: Hyper,
     resolve_playable: bool = True,
-    expected_type: ExpectedTypeType | None = None,
+    expected_type: Optional[ExpectedTypeType] = None,
     use_cool_down: bool = False,
-) -> GeneralSongOrPlaylist | None:
+) -> Optional[GeneralSongOrPlaylist]:
     if not (raw := card.raw):
         return None
 
@@ -171,10 +173,10 @@ async def resolve_from_card(
 async def resolve_from_msg(
     msg: UniMessage,
     resolve_playable_card: bool = True,
-    expected_type: ExpectedTypeType | None = None,
+    expected_type: Optional[ExpectedTypeType] = None,
     use_cool_down: bool = False,
-    bot: BaseBot | None = None,
-) -> GeneralSongOrPlaylist | None:
+    bot: Optional[BaseBot] = None,
+) -> Optional[GeneralSongOrPlaylist]:
     if (h := extract_song_card_hyper(msg, bot)) and (
         it := await resolve_from_card(
             h,
@@ -195,9 +197,9 @@ async def resolve_from_ev_msg(
     state: T_State,
     bot: BaseBot,
     matcher: Matcher,
-    expected_type: ExpectedTypeType | None = None,
+    expected_type: Optional[ExpectedTypeType] = None,
 ) -> GeneralSongOrPlaylist:
-    regex_matched: re.Match[str] | None = state.get(REGEX_MATCHED)
+    regex_matched: Optional[re.Match[str]] = state.get(REGEX_MATCHED)
     if regex_matched:  # auto resolve
         if h := extract_song_card_hyper(msg, bot):
             if it := await resolve_from_card(
@@ -227,7 +229,7 @@ async def resolve_from_ev_msg(
     ):
         return it
 
-    await matcher.finish()
+    await matcher.finish()  # noqa: RET503: NoReturn
 
 
 async def dependency_resolve_from_ev(
@@ -270,7 +272,7 @@ async def dependency_resolve_playlist_from_ev(
 
 
 async def dependency_is_auto_resolve(state: T_State) -> bool:
-    return not not state.get(REGEX_MATCHED)
+    return bool(state.get(REGEX_MATCHED))
 
 
 ResolvedItem = Annotated[

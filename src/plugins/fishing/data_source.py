@@ -2,7 +2,7 @@ import random
 import time
 
 import ujson as json
-from nonebot.adapters.onebot.v11 import GroupMessageEvent, PrivateMessageEvent
+from nonebot.adapters.milky.event import FriendMessageEvent, GroupMessageEvent
 from nonebot_plugin_orm import get_session
 from sqlalchemy import select, update
 
@@ -174,9 +174,7 @@ async def save_fish(user_id: str, fish_name: str, fish_long: int) -> None:
     async with get_session() as session:
         stmt = select(FishingRecord).where(FishingRecord.user_id == user_id)
         result = await session.execute(stmt)
-        record = result.scalar_one_or_none()
-
-        if record:
+        if record := result.scalar_one_or_none():
             loads_fishes: dict[str, list[int]] = json.loads(record.fishes)
             try:
                 loads_fishes[fish_name].append(fish_long)
@@ -186,7 +184,6 @@ async def save_fish(user_id: str, fish_name: str, fish_long: int) -> None:
             record.time = time_now + fishing_limit
             record.frequency += 1
             record.fishes = dump_fishes
-            await session.commit()
         else:
             data = {fish_name: [fish_long]}
             dump_fishes = json.dumps(data)
@@ -197,7 +194,7 @@ async def save_fish(user_id: str, fish_name: str, fish_long: int) -> None:
                 fishes=dump_fishes,
             )
             session.add(new_record)
-            await session.commit()
+        await session.commit()
 
 
 async def get_stats(user_id: str) -> str:
@@ -205,9 +202,7 @@ async def get_stats(user_id: str) -> str:
     async with get_session() as session:
         stmt = select(FishingRecord).where(FishingRecord.user_id == user_id)
         result = await session.execute(stmt)
-        fishing_record = result.scalar_one_or_none()
-
-        if fishing_record:
+        if fishing_record := result.scalar_one_or_none():
             total_length = sum(
                 sum(fish_long)
                 for fish_long in json.loads(fishing_record.fishes).values()
@@ -226,9 +221,7 @@ async def get_backpack(user_id: str) -> str | list:
     async with get_session() as session:
         stmt = select(FishingRecord).where(FishingRecord.user_id == user_id)
         result = await session.execute(stmt)
-        fishes_record = result.scalar_one_or_none()
-
-        if fishes_record:
+        if fishes_record := result.scalar_one_or_none():
             load_fishes = json.loads(fishes_record.fishes)
             if not load_fishes:
                 return "你的背包里空无一物"
@@ -266,9 +259,7 @@ async def sell_quality_fish(user_id: str, quality: str) -> str:
     async with get_session() as session:
         stmt = select(FishingRecord).where(FishingRecord.user_id == user_id)
         result = await session.execute(stmt)
-        fishes_record = result.scalar_one_or_none()
-
-        if fishes_record:
+        if fishes_record := result.scalar_one_or_none():
             load_fishes = json.loads(fishes_record.fishes)
             if not load_fishes:
                 return "你的背包里空无一物"
@@ -303,9 +294,7 @@ async def sell_all_fish(user_id: str) -> str:
     async with get_session() as session:
         stmt = select(FishingRecord).where(FishingRecord.user_id == user_id)
         result = await session.execute(stmt)
-        fishes_record = result.scalar_one_or_none()
-
-        if fishes_record:
+        if fishes_record := result.scalar_one_or_none():
             load_fishes = json.loads(fishes_record.fishes)
             if not load_fishes:
                 return "你的背包里空无一物"
@@ -340,9 +329,7 @@ async def sell_fish(user_id: str, fish_name: str) -> str:
     async with get_session() as session:
         stmt = select(FishingRecord).where(FishingRecord.user_id == user_id)
         result = await session.execute(stmt)
-        fishes_record = result.scalar_one_or_none()
-
-        if fishes_record:
+        if fishes_record := result.scalar_one_or_none():
             load_fishes = json.loads(fishes_record.fishes)
             if fish_name not in load_fishes:
                 return "你的背包里没有这种鱼"
@@ -370,34 +357,32 @@ async def get_balance(user_id: str) -> str:
     return f"你有 {coin} {fishing_coin_name}" if coin else "你什么也没有 :)"
 
 
-async def switch_fish(event: GroupMessageEvent | PrivateMessageEvent) -> bool:
+async def switch_fish(event: GroupMessageEvent | FriendMessageEvent) -> bool:
     """钓鱼开关切换，没有就创建"""
-    if isinstance(event, PrivateMessageEvent):
+    if isinstance(event, FriendMessageEvent):
         return True
 
     async with get_session() as session:
-        stmt = select(FishingSwitch).where(FishingSwitch.group_id == event.group_id)
+        stmt = select(FishingSwitch).where(FishingSwitch.group_id == event.data.peer_id)
         result = await session.execute(stmt)
-        switch = result.scalar_one_or_none()
-
-        if switch:
+        if switch := result.scalar_one_or_none():
             switch.switch = not switch.switch
             await session.commit()
             return switch.switch
         else:
-            new_switch = FishingSwitch(group_id=event.group_id, switch=False)
+            new_switch = FishingSwitch(group_id=event.data.peer_id, switch=False)
             session.add(new_switch)
             await session.commit()
             return False
 
 
-async def get_switch_fish(event: GroupMessageEvent | PrivateMessageEvent) -> bool:
+async def get_switch_fish(event: GroupMessageEvent | FriendMessageEvent) -> bool:
     """获取钓鱼开关"""
-    if isinstance(event, PrivateMessageEvent):
+    if isinstance(event, FriendMessageEvent):
         return True
 
     async with get_session() as session:
-        stmt = select(FishingSwitch).where(FishingSwitch.group_id == event.group_id)
+        stmt = select(FishingSwitch).where(FishingSwitch.group_id == event.data.peer_id)
         result = await session.execute(stmt)
         switch = result.scalar_one_or_none()
 

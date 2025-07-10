@@ -44,6 +44,7 @@ SEND_APIS: dict[str, list[str] | Callable[[str], bool]] = {
     "Satori": ["message_create"],
     "Telegram": lambda x: x.startswith("send_"),
     "大别野": ["send_message"],
+    "Milky": ["send_private_message", "send_group_message"],
 }
 
 

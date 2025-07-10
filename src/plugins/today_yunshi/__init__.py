@@ -1,7 +1,8 @@
 """这是一个今日运势插件，可以查看今日运势。"""
 
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Bot, MessageEvent
+from nonebot.adapters import Bot
+from nonebot.adapters.milky import MessageEvent
 from nonebot.plugin import PluginMetadata
 
 from .data_source import luck_result
@@ -17,5 +18,5 @@ Luck = on_command("今日运势", aliases={"运势"}, block=True)
 
 @Luck.handle()
 async def luck(bot: Bot, event: MessageEvent):
-    result = await luck_result(str(event.user_id))
+    result = await luck_result(str(event.data.sender_id))
     await bot.send(event, result, reply_message=True)

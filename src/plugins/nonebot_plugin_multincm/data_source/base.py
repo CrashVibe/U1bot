@@ -6,8 +6,11 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Generic, Optional, TypeVar, Union
 from typing_extensions import Self, TypeAlias, TypeGuard, override
 
+from yarl import URL
+
 from ..config import config
 from ..utils import (
+    NCMLrcGroupLine,
     build_item_link,
     calc_max_page,
     calc_min_index,
@@ -120,9 +123,7 @@ class SongInfo(Generic[_TSong]):
 
     @property
     def file_suffix(self) -> Optional[str]:
-        with suppress(Exception):
-            return self.playable_url.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
-        return None
+        return URL(self.playable_url).suffix.removeprefix(".") or None
 
     @property
     def display_filename(self) -> str:
@@ -179,7 +180,7 @@ class BaseSong(ResolvableFromID, ABC, Generic[_TRawResp]):
     async def get_playable_url(self) -> str: ...
 
     @abstractmethod
-    async def get_lyrics(self) -> Optional[list[list[str]]]: ...
+    async def get_lyrics(self) -> Optional[list[NCMLrcGroupLine]]: ...
 
     async def get_info(self) -> SongInfo:
         (

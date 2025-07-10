@@ -3,8 +3,8 @@ import re
 import ssl
 
 import aiohttp
-from nonebot.adapters.onebot.v11 import MessageEvent
-from nonebot.adapters.onebot.v11.utils import unescape
+from nonebot.adapters.milky import MessageEvent
+from nonebot.adapters.milky.message import Image, IncomingImageData
 
 
 async def url_to_base64(image_url) -> str:
@@ -24,9 +24,7 @@ def extract_image_url(message: str) -> str:
     - message (str): 消息文本。
 
     Returns:
-    - tuple: 包含两个元素：
-        - is_image (bool): 是否找到图片 URL。
-        - image_url (str): 图片 URL。
+    - str: 图片 URL。
     """
     url_pattern = r"url=(https?[^,]+)"
     if image_match := re.search(url_pattern, message):
@@ -39,71 +37,59 @@ def extract_image_url(message: str) -> str:
     return ""
 
 
-def replace_cq_with_caption(text: str, base64_image: str) -> str:
+def extract_base64_from_cq_codes(text: str) -> list[str]:
     """
-    将文本中的 [CQ:...] 标签替换为指定的描述。
+    从文本中提取所有 [CQ:image,file=base64://...] 中的 base64 数据。
 
     参数:
-    - text: 包含 [CQ:...] 标签的原始文本
-    - caption: 用于替换 [CQ:...] 的描述文本
+    - text: 包含 CQ 码的文本
 
     返回值:
-    - 替换后的文本
+    - list[str]: 所有提取到的 base64 数据列表
     """
-    # 反转义
-    text = unescape(text)
-    potential_matches = re.finditer(r"\[CQ:image", text)
-    result = []
-    last_pos = 0
-    replacement_template = f"[CQ:image,file=base64://{base64_image}]"
+    base64_images = []
+    # 匹配 [CQ:image,file=base64://xxxxx] 格式
+    cq_pattern = r"\[CQ:image,file=base64://([^]]+)\]"
+    matches = re.findall(cq_pattern, text)
+    base64_images.extend(matches)
 
-    for match in potential_matches:
-        start = match.start()
-        result.append(text[last_pos:start])  # 添加上次匹配结束到这次匹配开始的部分
-        # 从匹配位置开始逐字符解析，寻找完整的 [CQ:image,...]
-        i = start
-        depth = 0
-        while i < len(text):
-            if text[i] == "[":
-                depth += 1
-            elif text[i] == "]":
-                depth -= 1
-                if depth == 0:
-                    # 匹配到完整的 [CQ:image,...]
-                    result.append(replacement_template)
-                    last_pos = i + 1  # 更新最后的结束位置
-                    break
-            i += 1
-        else:
-            # 如果没能闭合，直接保留原始文本
-            last_pos = start
-
-    # 添加剩余未处理的部分
-    result.append(text[last_pos:])
-    return "".join(result)
+    return base64_images
 
 
-async def is_image_message(
-    data: MessageEvent, is_cq_code: bool = False
-) -> tuple[bool, str]:
-    if is_cq_code:
-        image_url = extract_image_url(str(data.message))
-        return (
-            (
-                True,
-                replace_cq_with_caption(
-                    str(data.message), await url_to_base64(image_url)
-                ),
-            )
-            if image_url
-            else (False, "")
-        )
+def remove_cq_codes(text: str) -> str:
+    """
+    移除文本中的所有 CQ 码。
+
+    参数:
+    - text: 包含 CQ 码的文本
+
+    返回值:
+    - str: 移除 CQ 码后的纯文本
+    """
+    # 移除所有 [CQ:...] 格式的代码
+    return re.sub(r"\[CQ:[^\]]+\]", "", text).strip()
+
+
+async def process_image_message(data: MessageEvent) -> tuple[bool, str, list[str]]:
+    """
+    处理图片消息，返回是否包含图片、处理后的文本和图片base64数据。
+
+    参数:
+    - data: 消息事件数据
+
+    返回值:
+    - tuple: (是否包含图片, 处理后的文本, 图片base64数据列表)
+    """
+    has_image = False
+    base64_images = []
 
     for msg in data.message:
-        print(msg)
-        if msg.type == "image" and (image_url := msg.data.get("url", "")):
-            return True, replace_cq_with_caption(
-                str(data.message), await url_to_base64(image_url)
-            )
+        if isinstance(msg, Image) and msg.data is IncomingImageData:
+            has_image = True
+            base64_data = await url_to_base64(msg.data["temp_url"])
+            base64_images.append(base64_data)
 
-    return False, ""
+    # 移除消息中的所有 CQ 码
+    clean_text = remove_cq_codes(str(data.message))
+
+    return has_image, clean_text, base64_images

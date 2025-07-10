@@ -17,6 +17,7 @@ class ConfigModel(BaseConfigModel):
     ncm_email: Optional[str] = None
     ncm_password: Optional[str] = None
     ncm_password_hash: Optional[str] = None
+    ncm_anonymous: bool = False
 
     # ui
     ncm_list_limit: int = 20
@@ -41,7 +42,6 @@ class ConfigModel(BaseConfigModel):
     ncm_resolve_cool_down_cache_size: int = 1024
     ncm_card_sign_url: Optional[Annotated[str, AnyHttpUrl]] = None
     ncm_card_sign_timeout: int = 5
-    ncm_ob_v11_local_mode: bool = False
     ncm_ffmpeg_executable: str = "ffmpeg"
 
 

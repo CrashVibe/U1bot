@@ -1,17 +1,18 @@
 import importlib
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Dict, Optional, Set, TypedDict
-from typing_extensions import Protocol, Unpack
+from typing import Any, TypedDict
 
 from nonebot import logger
+from typing_extensions import Protocol, Unpack
 
 from ..bg_provider import BgData
 from ..config import config
 
 
 class TemplateRendererKwargs(TypedDict):
-    collected: Dict[str, Any]
+    collected: dict[str, Any]
     bg: BgData
 
 
@@ -27,15 +28,15 @@ class TemplateRenderer(Protocol):
 @dataclass()
 class TemplateInfo:
     renderer: TemplateRenderer
-    collectors: Optional[Set[str]] = None
+    collectors: set[str] | None = None
 
 
-loaded_templates: Dict[str, TemplateInfo] = {}
+loaded_templates: dict[str, TemplateInfo] = {}
 
 
 def pic_template(
-    name: Optional[str] = None,
-    collecting: Optional[Set[str]] = None,
+    name: str | None = None,
+    collecting: set[str] | None = None,
 ):
     def deco(func: TemplateRenderer):
         template_name = name or func.__name__

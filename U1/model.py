@@ -16,5 +16,5 @@ class Channel(Model):
     permissions = fields.TextField(null=True, default=None)
     createdAt = fields.DatetimeField(null=True, default=None)
 
-    class Meta:
+    class Meta: # type: ignore
         unique_together = ("platform", "flag")

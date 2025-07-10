@@ -1,8 +1,10 @@
+import base64
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from nonebot import on_command, require
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, MessageSegment
+from nonebot.adapters.milky import Bot, Message, MessageSegment
+from nonebot.adapters.milky.event import GroupMessageEvent
 from nonebot.params import CommandArg
 
 require("nonebot_plugin_orm")
@@ -20,11 +22,7 @@ async def show_yinpa_record(
     bot: Bot, event: GroupMessageEvent, arg: Message = CommandArg()
 ):
     # 获取目标用户
-    if targets := get_message_at(arg):
-        user_id = targets[0]
-    else:
-        user_id = event.user_id
-
+    user_id = targets[0] if (targets := get_message_at(arg)) else event.data.sender_id
     async with get_session() as session:
         # 查询记录
         active_stmt = select(YinpaActive).where(YinpaActive.user_id == user_id)
@@ -42,6 +40,9 @@ async def show_yinpa_record(
         content += f"被透次数：{passive.passive_count if passive else 0}\n"
         content += f"最后更新时间：{datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d %H:%M')}"
 
-        # 生成图片
+    # 生成图片
     img_bytes = bbcode_to_png(content)
-    await record.finish(MessageSegment.image(img_bytes))
+    img_bytes.seek(0)
+    b64 = base64.b64encode(img_bytes.read()).decode("utf-8")
+    data_uri = f"base64://{b64}"
+    await record.finish(MessageSegment.image(data_uri))

@@ -5,7 +5,7 @@ import httpx
 import nonebot
 from aiocache import cached
 from nonebot import logger
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel
 
 try:
     import ujson as json
@@ -13,7 +13,7 @@ except ModuleNotFoundError:
     import json
 
 
-class PluginConfig(BaseModel, extra=Extra.ignore):
+class PluginConfig(BaseModel, extra="allow"):
     """
     Path of tarot images resource
     """

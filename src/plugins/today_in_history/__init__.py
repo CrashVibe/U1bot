@@ -1,12 +1,12 @@
+import base64
 from datetime import date
 
 import httpx
 import ujson as json
-from nonebot import get_driver, on_fullmatch, require
-from nonebot.adapters.onebot.v11 import MessageSegment
+from nonebot import on_fullmatch, require
+from nonebot.adapters.milky import MessageSegment
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_htmlrender import text_to_pic
-
 
 require("nonebot_plugin_apscheduler")
 
@@ -88,4 +88,6 @@ async def get_history_info() -> MessageSegment:
                 if i == len_max - 1
                 else f"{s}{str_year} {str_title}\n"
             )
-        return MessageSegment.image(await text_to_pic(s))
+        img_bytes = await text_to_pic(s)
+        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+        return MessageSegment.image(f"base64://{img_base64}")

@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 from nonebot import on_fullmatch, on_startswith
 from nonebot.adapters import Bot
-from nonebot.adapters.onebot.v11 import GroupMessageEvent
+from nonebot.adapters.milky.event import GroupMessageEvent
 
 from . import scheduler
 from .data_source import (
@@ -48,8 +48,8 @@ night_2 = on_fullmatch(msg="晚")
 @morning.handle()
 @morning_2.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
-    uid = event.user_id
-    gid = event.group_id
+    uid = event.data.sender_id
+    gid = event.data.peer_id
 
     await morning.finish(await get_morning_msg(uid, gid), reply_message=True)
 
@@ -57,8 +57,8 @@ async def _(bot: Bot, event: GroupMessageEvent):
 @night.handle()
 @night_2.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
-    uid = event.user_id
-    gid = event.group_id
+    uid = event.data.sender_id
+    gid = event.data.peer_id
 
     await night.finish(await get_night_msg(uid, gid), reply_message=True)
 
@@ -70,7 +70,8 @@ statistics = on_fullmatch(msg="早晚安统计")
 
 @statistics.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
-    gid = event.group_id
+    gid = event.data.peer_id
+
     (
         morning_count,
         night_count,
@@ -111,7 +112,7 @@ my_sleep = on_fullmatch(msg="我的作息")
 
 @my_sleep.handle()
 async def _(bot: Bot, event: GroupMessageEvent):
-    uid = event.user_id
+    uid = event.data.sender_id
 
     user_data = await get_weekly_sleep_data(uid)
 
@@ -122,9 +123,7 @@ async def _(bot: Bot, event: GroupMessageEvent):
 
     # 格式化时间显示
     def format_time(dt: datetime | None) -> str:
-        if dt is None:
-            return "无"
-        return dt.strftime("%Y年%m月%d日 %H:%M:%S")
+        return "无" if dt is None else dt.strftime("%Y年%m月%d日 %H:%M:%S")
 
     # 格式化睡眠时长（从秒转换为小时分钟）
     def format_sleep_time(seconds: int) -> str:

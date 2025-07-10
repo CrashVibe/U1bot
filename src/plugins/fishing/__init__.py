@@ -2,21 +2,24 @@ import asyncio
 import random
 
 from nonebot import get_driver, on_command, on_fullmatch
-from nonebot.adapters import Event, Message
-from nonebot.adapters.onebot.v11 import (
+from nonebot.adapters import Event
+from nonebot.adapters.milky import (
     Bot,
-    GroupMessageEvent,
+    Message,
     MessageEvent,
-    PrivateMessageEvent,
+    MessageSegment,
 )
-from nonebot.adapters.onebot.v11.helpers import (
-    Cooldown,
-    CooldownIsolateLevel,
-)
-from nonebot.adapters.onebot.v11.permission import GROUP_ADMIN, GROUP_OWNER
+from nonebot.adapters.milky.event import FriendMessageEvent, GroupMessageEvent
+from nonebot.adapters.milky.message import OutgoingForwardedMessage
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata
+
+from U1.utils.permission import GROUP_ADMIN, GROUP_OWNER
+from U1.utils.token_bucket import (
+    Cooldown,
+    CooldownIsolateLevel,
+)
 
 from .config import Config, config
 from .data_source import (
@@ -75,16 +78,17 @@ async def _update(event: Event):
         )
     ]
 )
-async def _fishing(event: GroupMessageEvent | PrivateMessageEvent, bot: Bot):
+async def _fishing(event: GroupMessageEvent | FriendMessageEvent, bot: Bot):
     """钓鱼"""
     if isinstance(event, GroupMessageEvent) and not await get_switch_fish(event):
         await fishing.finish("钓鱼在本群处于关闭状态，请看菜单重新打开")
 
     user_id = event.get_user_id()
     fish = await choice(user_id=user_id)
-    await bot.set_msg_emoji_like(
-        message_id=event.message_id,
-        emoji_id="127881",
+    await bot.send_group_message_reaction(
+        group_id=event.data.peer_id,
+        message_seq=event.message_id,
+        reaction="127881",
     )
 
     fish_name = fish[0]
@@ -116,11 +120,24 @@ async def _backpack(bot: Bot, event: MessageEvent):
     """背包"""
     user_id = event.get_user_id()
     fmt = await get_backpack(user_id)
-    return (
-        await backpack.send(fmt)
-        if isinstance(fmt, str)
-        else await send_forward_msg(bot, event, Bot_NICKNAME, bot.self_id, fmt)
-    )
+
+    if isinstance(fmt, str):
+        await backpack.finish(fmt)
+    else:
+        messages: list[MessageSegment] = []
+        # 将每个品质的信息转换为消息段
+        messages.extend(MessageSegment.text(quality_info) for quality_info in fmt)
+        # 创建转发消息
+        forward_msg = [
+            OutgoingForwardedMessage(
+                name=Bot_NICKNAME,
+                user_id=int(bot.self_id),
+                segments=[messages_seq],
+            )
+            for messages_seq in messages
+        ]
+
+        await backpack.finish(MessageSegment.forward(forward_msg))
 
 
 @sell.handle()
@@ -145,41 +162,9 @@ async def _balance(event: Event):
 
 
 @switch.handle()
-async def _switch(event: GroupMessageEvent | PrivateMessageEvent):
+async def _switch(event: GroupMessageEvent | FriendMessageEvent):
     """钓鱼开关"""
     if await switch_fish(event):
         await switch.finish("钓鱼 已打开")
     else:
         await switch.finish("钓鱼 已关闭")
-
-
-async def send_forward_msg(
-    bot: Bot,
-    event: MessageEvent,
-    name: str,
-    uin: str,
-    msgs: list,
-) -> dict:
-    """
-    发送转发消息的异步函数。
-
-    参数:
-        bot (Bot): 机器人实例
-        event (MessageEvent): 消息事件
-        name (str): 转发消息的名称
-        uin (str): 转发消息的 UIN
-        msgs (list): 转发的消息列表
-
-    返回:
-        dict: API 调用结果
-    """
-
-    def to_json(msg: Message):
-        return {"type": "node", "data": {"name": name, "uin": uin, "content": msg}}
-
-    messages = [to_json(msg) for msg in msgs]
-    if isinstance(event, GroupMessageEvent):
-        return await bot.send_group_forward_msg(
-            group_id=event.group_id, messages=messages
-        )
-    return await bot.send_private_forward_msg(user_id=event.user_id, messages=messages)

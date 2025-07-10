@@ -3,7 +3,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from nonebot import get_driver, logger, on_command, require
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, MessageSegment
+from nonebot.adapters.milky import Bot, Message, MessageSegment
+from nonebot.adapters.milky.event import GroupMessageEvent
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata
 from nonebot_plugin_apscheduler import scheduler
@@ -174,8 +175,8 @@ async def handle_waifu(bot: Bot, event: GroupMessageEvent):
     if not await validate_user(bot, event):
         return
 
-    group_id = event.group_id
-    user_id = event.user_id
+    group_id = event.data.peer_id
+    user_id = event.data.sender_id
 
     from nonebot_plugin_orm import get_session
 
@@ -231,9 +232,9 @@ async def select_waifu(
 
 async def get_available_members(bot: Bot, group_id: int, protected: list) -> list[int]:
     return [
-        member["user_id"]
+        member.user_id
         for member in await bot.get_group_member_list(group_id=group_id)
-        if member["user_id"] not in [*protected, bot.self_id, 2854196310]
+        if member.user_id not in [*protected, int(bot.self_id), 2854196310]
     ]
 
 
@@ -242,29 +243,26 @@ async def validate_user(bot: Bot, event: GroupMessageEvent) -> bool:
         await bot.send(event, "不可以啦...", at_sender=True)
         return False
 
-    protected = await get_protected_users(event.group_id)
-    if event.user_id in protected:
-        return False
-
-    return True
+    protected = await get_protected_users(event.data.peer_id)
+    return event.data.sender_id not in protected
 
 
 async def handle_existing_cp(bot: Bot, event: GroupMessageEvent, existing_cp: int):
     member = await bot.get_group_member_info(
-        group_id=event.group_id, user_id=existing_cp
+        group_id=event.data.peer_id, user_id=existing_cp
     )
     msg = (
         f"你已经有 CP 了，不许花心哦~{MessageSegment.image(await user_img(existing_cp))}"
-        f"你的 CP：{member['card'] or member['nickname']}"
+        f"你的 CP：{member.card or member.nickname}"
     )
     await bot.send(event, Message(msg), at_sender=True)
 
 
 async def send_result(bot: Bot, event: GroupMessageEvent, selected: int):
-    member = await bot.get_group_member_info(group_id=event.group_id, user_id=selected)
+    member = await bot.get_group_member_info(group_id=event.data.peer_id, user_id=selected)
     msg = (
         f"你的 CP 是！\n{MessageSegment.image(await user_img(selected))}"
-        f"『{member['card'] or member['nickname']}』!"
+        f"『{member.card or member.nickname}』!"
         f"\n{random.choice(happy_end)}"
     )
     await waifu.finish(Message(msg), at_sender=True)
@@ -286,7 +284,7 @@ async def handle_at_selection(
     :param taken_users: 已被娶的群友列表
     :return: 选择的用户 ID 或 None
     """
-    user_id = event.user_id
+    user_id = event.data.sender_id
 
     # 检查是否是自己
     if at_user_id == user_id:
@@ -303,10 +301,7 @@ async def handle_at_selection(
 
     # 随机选择逻辑
     X = random.randint(1, 100)
-    if 0 < X <= HE:
-        return at_user_id
-    else:
-        return None
+    return at_user_id if 0 < X <= HE else None
 
 
 async def clean_cd_cache():
