@@ -98,16 +98,7 @@ async def _(bot: Bot, event: GroupMessageEvent):
         raise IgnoredException("未找到频道，忽略")
 
     if channel.assignee != bot_qqid:
-        from nonebot import get_bots
-
-        available_bots = get_bots()
-
-        if channel.assignee not in available_bots:
-            logger.warning(
-                f"指定机器人 {channel.assignee} 不在线，临时使用当前机器人 {bot_qqid}"
-            )
-        else:
-            raise IgnoredException("机器人不是频道指定的机器人，忽略")
+        raise IgnoredException("机器人不是频道指定的机器人，忽略")
 
 
 if __name__ == "__main__":
