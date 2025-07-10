@@ -160,17 +160,32 @@ async def _(bot: Bot, event: MessageEvent):
         await session.commit()
         await session.refresh(caves)
 
-        result = f"[投稿成功 #{caves.id}]\n"
-        result += f"{caves.details}\n"
-        result += "————————————\n"
-        result += f"投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += f"消耗次元币: 200 | 余额: {remaining_coin:.1f}"
+        # 构建包含图片的消息序列
+        img_seq: list[MessageSegment] = []
+
+        # 投稿内容部分
+        content_part = f"[投稿成功 #{caves.id}]\n{caves.details}"
+        img_seq.append(MessageSegment.text(content=content_part))
+
+        # 图片部分
+        if caves.img_base64:
+            img_seq.extend(
+                [
+                    MessageSegment.image(base64=img_base64)
+                    for img_base64 in caves.img_base64
+                ]
+            )
+
+        # 分割线和信息部分
+        info_part = f"\n————————————\n投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n消耗次元币: 200 | 余额: {remaining_coin:.1f}"
+        img_seq.append(MessageSegment.text(content=info_part))
+
         for i in SUPERUSER_list:
             await bot.send_private_message(
                 user_id=int(i),
                 message=Message(f"来自用户{event.get_user_id()}\n{result}"),
             )
-        await cave_add.finish(Message(f"{result}"))
+        await cave_add.finish(message=Message(img_seq))
 
 
 @cave_am_add.handle()
@@ -192,23 +207,37 @@ async def _(bot: Bot, event: MessageEvent):
         )
 
     async with get_session() as session:
-        caves = cave_models(details=details, user_id=user_id, anonymous=True, img_base64=base64_images)
+        caves = cave_models(
+            details=details, user_id=user_id, anonymous=True, img_base64=base64_images
+        )
         session.add(caves)
         await session.commit()
-        await session.refresh(caves)
+        await session.refresh(caves)  # 构建包含图片的消息序列
+        img_seq: list[MessageSegment] = []
 
-        result = f"[匿名投稿成功 #{caves.id}]\n"
-        result += f"{caves.details}\n"
-        result += "————————————\n"
-        result += f"投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        result += "匿名投稿会保存用户信息但其他用户无法看到作者\n"
-        result += f"消耗次元币: 400 | 余额: {remaining_coin:.1f}"
+        # 投稿内容部分
+        content_part = f"[匿名投稿成功 #{caves.id}]\n{caves.details}"
+        img_seq.append(MessageSegment.text(content=content_part))
+
+        # 图片部分
+        if caves.img_base64:
+            img_seq.extend(
+                [
+                    MessageSegment.image(base64=img_base64)
+                    for img_base64 in caves.img_base64
+                ]
+            )
+
+        # 分割线和信息部分
+        info_part = f"\n————————————\n投稿时间: {caves.time.strftime('%Y-%m-%d %H:%M:%S')}\n匿名投稿会保存用户信息但其他用户无法看到作者\n消耗次元币: 400 | 余额: {remaining_coin:.1f}"
+        img_seq.append(MessageSegment.text(content=info_part))
+
         for i in SUPERUSER_list:
             await bot.send_private_message(
                 user_id=int(i),
                 message=Message(f"来自用户{event.get_user_id()}\n{result}"),
             )
-        await cave_am_add.finish(Message(f"{result}"))
+        await cave_am_add.finish(message=Message(img_seq))
 
 
 @cave_del.handle()
@@ -246,23 +275,50 @@ async def _(bot: Bot, event: MessageEvent):
                 )
                 await cave_del.send("删除失败，私聊通知失败")
         elif event.data.sender_id == data.user_id:
-            result_content = data.details
             await session.delete(data)
             await session.commit()
-            await cave_del.finish(
-                Message(f"[删除成功] 编号 {key} 的投稿已删除\n内容: {result_content}")
-            )
+            img_seq: list[MessageSegment] = []
+
+            # 投稿内容部分
+            content_part = f"[删除成功] 编号 {key} 的投稿已删除\n内容: {data.details}"
+            img_seq.append(MessageSegment.text(content=content_part))
+
+            # 图片部分
+            if data.img_base64:
+                img_seq.extend(
+                    [
+                        MessageSegment.image(base64=img_base64)
+                        for img_base64 in data.img_base64
+                    ]
+                )
+
+            await cave_del.finish(message=Message(img_seq))
         else:
             await cave_del.finish("您没有权限删除此投稿")
 
-        result_content = data.details
         await session.delete(data)
         await session.commit()
-        await cave_del.finish(
-            Message(
-                f"[删除成功] 编号 {key} 的投稿已删除\n内容: {result_content}\n删除原因: {reason}"
+
+        img_seq: list[MessageSegment] = []
+
+        # 投稿内容部分
+        content_part = f"[删除成功] 编号 {key} 的投稿已删除\n内容: {data.details}"
+        img_seq.append(MessageSegment.text(content=content_part))
+
+        # 图片部分
+        if data.img_base64:
+            img_seq.extend(
+                [
+                    MessageSegment.image(base64=img_base64)
+                    for img_base64 in data.img_base64
+                ]
             )
-        )
+
+        # 分割线和删除原因部分
+        reason_part = f"\n————————————\n删除原因: {reason}"
+        img_seq.append(MessageSegment.text(content=reason_part))
+
+        await cave_main.finish(message=Message(img_seq))
 
 
 @cave_main.handle()
@@ -282,12 +338,27 @@ async def _(args: Message = CommandArg()):
             displayname = (
                 "匿名用户" if random_cave.anonymous else f"用户{random_cave.user_id}"
             )
-            result = f"[回声洞 #{random_cave.id}]\n"
-            result += f"{random_cave.details}\n"
-            result += "————————————\n"
-            result += f"投稿人：{displayname}\n"
-            result += f"时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            result += "\n私聊机器人可以投稿：\n投稿 [内容] | 匿名投稿 [内容]"
+
+            img_seq: list[MessageSegment] = []
+
+            # 投稿内容部分
+            content_part = f"[回声洞 #{random_cave.id}]\n{random_cave.details}"
+            img_seq.append(MessageSegment.text(content=content_part))
+
+            # 图片部分
+            if random_cave.img_base64:
+                img_seq.extend(
+                    [
+                        MessageSegment.image(base64=img_base64)
+                        for img_base64 in random_cave.img_base64
+                    ]
+                )
+
+            # 分割线和信息部分
+            info_part = f"\n————————————\n投稿人：{displayname}\n时间：{random_cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n\n私聊机器人可以投稿：\n投稿 [内容] | 匿名投稿 [内容]"
+            img_seq.append(MessageSegment.text(content=info_part))
+
+            await cave_main.finish(message=Message(img_seq))
         else:
             # 验证输入是否为有效的数字
             try:
@@ -304,14 +375,27 @@ async def _(args: Message = CommandArg()):
 
             # 判断是否是匿名
             displayname = "匿名用户" if cave.anonymous else f"用户{cave.user_id}"
-            result = f"[回声洞 #{cave.id}]\n"
-            result += f"{cave.details}\n"
-            result += "————————————\n"
-            result += f"投稿人: {displayname}\n"
-            result += f"时间: {cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n"
-            result += "\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
 
-        await cave_main.finish(Message(result))
+            img_seq: list[MessageSegment] = []
+
+            # 投稿内容部分
+            content_part = f"[回声洞 #{cave.id}]\n{cave.details}"
+            img_seq.append(MessageSegment.text(content=content_part))
+
+            # 图片部分
+            if cave.img_base64:
+                img_seq.extend(
+                    [
+                        MessageSegment.image(base64=img_base64)
+                        for img_base64 in cave.img_base64
+                    ]
+                )
+
+            # 分割线和信息部分
+            info_part = f"\n————————————\n投稿人: {displayname}\n时间: {cave.time.strftime('%Y-%m-%d %H:%M:%S')}\n\n私聊机器人可以投稿:\n投稿 [内容] | 匿名投稿 [内容]"
+            img_seq.append(MessageSegment.text(content=info_part))
+
+            await cave_main.finish(message=Message(img_seq))
 
 
 @cave_history.handle()
@@ -326,25 +410,42 @@ async def _(bot: Bot, event: MessageEvent):
             await cave_history.finish("您还没有任何投稿记录")
 
         # 构造转发消息
-        messages: list[MessageSegment] = [MessageSegment.text("您的回声洞投稿记录:")]
+        messages: list[list[MessageSegment]] = []
+        messages.append([MessageSegment.text("您的回声洞投稿记录:")])
 
         # 添加每个投稿记录
         for i in all_caves:
-            msg_content = (
-                f"[编号 #{i.id}]\n"
-                f"{i.details}\n"
-                f"————————————\n"
-                f"投稿时间: {i.time.strftime('%Y-%m-%d %H:%M:%S')}"
+            # 为每个投稿构建消息段列表
+            msg_segments: list[MessageSegment] = []
+
+            # 投稿内容部分
+            content_part = f"[编号 #{i.id}]\n{i.details}"
+            msg_segments.append(MessageSegment.text(content=content_part))
+
+            # 图片部分
+            if i.img_base64:
+                msg_segments.extend(
+                    [
+                        MessageSegment.image(base64=img_base64)
+                        for img_base64 in i.img_base64
+                    ]
+                )
+
+            # 分割线和信息部分
+            info_part = (
+                f"\n————————————\n投稿时间: {i.time.strftime('%Y-%m-%d %H:%M:%S')}"
             )
-            messages.append(MessageSegment.text(msg_content))
+            msg_segments.append(MessageSegment.text(content=info_part))
+
+            messages.append(msg_segments)
 
         forward_msgs = [
             OutgoingForwardedMessage(
                 name=Bot_NICKNAME,
                 user_id=int(bot.self_id),
-                segments=[messages_seg],
+                segments=msg_segments,
             )
-            for messages_seg in messages
+            for msg_segments in messages
         ]
 
         await cave_history.finish(MessageSegment.forward(forward_msgs))
