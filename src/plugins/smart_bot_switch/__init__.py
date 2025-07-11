@@ -1,8 +1,9 @@
 import time
 
 from nonebot import get_bots, logger, on_command
-from nonebot.adapters.onebot.v11 import ActionFailed, Bot, GroupMessageEvent
-from nonebot.internal.matcher.matcher import Matcher
+from nonebot.adapters.milky import Bot
+from nonebot.adapters.milky.exception import ActionFailed
+from nonebot.matcher import Matcher
 from nonebot.message import event_preprocessor, run_postprocessor
 from nonebot.plugin import PluginMetadata
 
@@ -19,7 +20,6 @@ __plugin_meta__ = PluginMetadata(
 """,
     type="application",
     homepage="https://github.com/nonebot/nonebot2",
-    supported_adapters={"~onebot.v11"},
 )
 
 # 简单的全局状态变量
@@ -98,7 +98,7 @@ async def handle_action_failed(
 
 # 事件处理器 - 追踪活动
 @event_preprocessor
-async def track_bot_activity(bot: Bot, event: GroupMessageEvent):
+async def track_bot_activity(bot: Bot):
     update_bot_activity(bot.self_id)
 
 
@@ -109,7 +109,7 @@ bot_health_cmd: type[Matcher] = on_command(
 
 
 @bot_health_cmd.handle()
-async def handle_bot_health(bot: Bot, event: GroupMessageEvent):
+async def handle_bot_health(bot: Bot):
     update_bot_activity(bot.self_id)
 
     available_bots = get_bots()
@@ -139,9 +139,7 @@ async def handle_bot_health(bot: Bot, event: GroupMessageEvent):
 
         msg_parts.append(f"{status_emoji} {bot_id}: {status_text} ({activity_status})")
 
-        # 显示失败的操作类型
-        failed_actions_list = status_info.get("failed_actions", [])
-        if failed_actions_list:
+        if failed_actions_list := status_info.get("failed_actions", []):
             failed_actions_str = ", ".join(failed_actions_list)
             msg_parts.append(f"   └ 失败操作: {failed_actions_str}")
 

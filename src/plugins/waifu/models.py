@@ -2,12 +2,13 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from nonebot import require
+from sqlalchemy.orm.properties import MappedColumn
 
 require("nonebot_plugin_orm")
 
 from nonebot_plugin_orm import Model
 from sqlalchemy import BigInteger, Boolean, DateTime, Index, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import mapped_column
 
 
 def get_current_time():
@@ -20,11 +21,11 @@ class WaifuRelationship(Model):
 
     __tablename__ = "waifu_relationships"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    partner_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
+    id: MappedColumn[int]= mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False, index=True)
+    user_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)
+    partner_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)
+    created_at: MappedColumn[datetime] = mapped_column(
         DateTime, default=get_current_time, nullable=False
     )
 
@@ -45,10 +46,10 @@ class WaifuProtectedUser(Model):
 
     __tablename__ = "waifu_protected_users"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
+    id: MappedColumn[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)
+    user_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)
+    created_at: MappedColumn[datetime] = mapped_column(
         DateTime, default=get_current_time, nullable=False
     )
 
@@ -64,17 +65,17 @@ class WaifuLock(Model):
 
     __tablename__ = "waifu_locks"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    lock_type: Mapped[str] = mapped_column(
+    id: MappedColumn[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)
+    user_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)
+    lock_type: MappedColumn[str] = mapped_column(
         String(50), nullable=False, default="general"
     )
-    expires_at: Mapped[datetime] = mapped_column(
+    expires_at: MappedColumn[datetime] = mapped_column(
         DateTime, nullable=True
     )  # 过期时间，None表示永久
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
+    is_active: MappedColumn[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: MappedColumn[datetime] = mapped_column(
         DateTime, default=get_current_time, nullable=False
     )
 
@@ -93,14 +94,14 @@ class YinpaRecord(Model):
 
     __tablename__ = "yinpa_records"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
-    active_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # 主动方
-    passive_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)  # 被动方
-    success: Mapped[bool] = mapped_column(
+    id: MappedColumn[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False, index=True)
+    active_user_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)  # 主动方
+    passive_user_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)  # 被动方
+    success: MappedColumn[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )  # 是否成功
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: MappedColumn[datetime] = mapped_column(
         DateTime, default=get_current_time, nullable=False
     )
 
@@ -117,12 +118,12 @@ class WaifuDailyReset(Model):
 
     __tablename__ = "waifu_daily_resets"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-    reset_date: Mapped[datetime] = mapped_column(
+    id: MappedColumn[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    group_id: MappedColumn[int] = mapped_column(BigInteger, nullable=False)
+    reset_date: MappedColumn[datetime] = mapped_column(
         DateTime, nullable=False
     )  # 重置日期（只到日期，不包含时间）
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: MappedColumn[datetime] = mapped_column(
         DateTime, default=get_current_time, nullable=False
     )
 
@@ -137,9 +138,9 @@ class YinpaActive(Model):
 
     __tablename__ = "yinpa_active"
 
-    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    active_count: Mapped[int] = mapped_column(default=0, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
+    user_id: MappedColumn[int] = mapped_column(BigInteger, primary_key=True)
+    active_count: MappedColumn[int] = mapped_column(default=0, nullable=False)
+    updated_at: MappedColumn[datetime] = mapped_column(
         DateTime, default=get_current_time, onupdate=get_current_time, nullable=False
     )
 
@@ -149,8 +150,8 @@ class YinpaPassive(Model):
 
     __tablename__ = "yinpa_passive"
 
-    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    passive_count: Mapped[int] = mapped_column(default=0, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
+    user_id: MappedColumn[int] = mapped_column(BigInteger, primary_key=True)
+    passive_count: MappedColumn[int] = mapped_column(default=0, nullable=False)
+    updated_at: MappedColumn[datetime] = mapped_column(
         DateTime, default=get_current_time, onupdate=get_current_time, nullable=False
     )

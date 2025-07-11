@@ -40,10 +40,7 @@ async def process_status() -> list[ProcessStatus]:
 
     def sorter(x: ProcessStatus):
         sort_by = config.ps_proc_sort_by
-        if sort_by == "mem":
-            return x.mem
-        # if sort_by == "cpu":
-        return x.cpu
+        return x.mem if sort_by == "mem" else x.cpu
 
     proc_list = cast(
         list[ProcessStatus | None | Exception],

@@ -3,7 +3,8 @@ import time
 
 from cachetools import TTLCache
 from nonebot import on_command, require
-from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, Message, MessageSegment
+from nonebot.adapters.milky import Bot, Message, MessageSegment
+from nonebot.adapters.milky.event import GroupMessageEvent
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import get_session
@@ -26,8 +27,8 @@ yinpa = on_command("透群友", block=True, priority=10)
 async def handle_yinpa(bot: Bot, event: GroupMessageEvent):
     # 检查目标用户
     targets = get_message_at(event.message)
-    user_id = event.user_id
-    group_id = event.group_id
+    user_id = event.data.sender_id
+    group_id = event.data.peer_id
 
     if targets:
         target = targets[0]
@@ -95,17 +96,17 @@ async def get_available_members(
     exclude = exclude or []
     members = await bot.get_group_member_list(group_id=group_id)
     return [
-        member["user_id"]
+        member.user_id
         for member in members
-        if member["user_id"] not in protected
-        and member["user_id"] not in exclude
-        and member["user_id"] != int(bot.self_id)  # 排除机器人
+        if member.user_id not in protected
+        and member.user_id not in exclude
+        and member.user_id != int(bot.self_id)
     ]
 
 
 def check_yinpa_cd(event: GroupMessageEvent) -> bool:
     """检查涩涩CD"""
-    key = f"yinpa_{event.group_id}_{event.user_id}"
+    key = f"yinpa_{event.data.peer_id}_{event.data.sender_id}"
     last_time = cd_cache.get(key, 0)
     if time.time() - last_time < 300:  # 5分钟CD
         return False
@@ -124,8 +125,10 @@ async def generate_yinpa_result(
 ) -> Message:
     """生成涩涩结果消息"""
     # 获取目标用户信息
-    member = await bot.get_group_member_info(group_id=event.group_id, user_id=target)
-    target_name = member["card"] or member["nickname"]
+    member = await bot.get_group_member_info(
+        group_id=event.data.peer_id, user_id=target
+    )
+    target_name = member.card or member.nickname
 
     if success:
         success_messages = [

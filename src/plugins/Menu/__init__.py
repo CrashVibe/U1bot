@@ -5,9 +5,9 @@ from pathlib import Path
 
 import ujson as json
 from nonebot import on_command
-from nonebot.adapters.onebot.v11 import Bot as V11Bot
-from nonebot.adapters.onebot.v11 import Message as V11Msg
-from nonebot.adapters.onebot.v11 import MessageSegment as V11MsgSeg
+from nonebot.adapters.milky import Bot
+from nonebot.adapters.milky import Message
+from nonebot.adapters.milky import MessageSegment
 from nonebot.log import logger
 from nonebot.matcher import Matcher
 from nonebot.params import CommandArg
@@ -39,11 +39,11 @@ with open(dir_path / "plugin.json", encoding="utf-8") as file:
 
 
 @menu.handle()
-async def _(bot: V11Bot, matcher: Matcher, arg: V11Msg = CommandArg()):
+async def _(bot: Bot, matcher: Matcher, arg: Message = CommandArg()):
     msg = arg.extract_plain_text().strip()
 
     if not msg:  # 参数为空，主菜单
-        await matcher.finish(V11MsgSeg.image(base64_str))
+        await matcher.finish(MessageSegment.image(base64_str))
 
     match_result = re.match(r"^(?P<name>.*?)$", msg)
     if not match_result:
@@ -76,7 +76,7 @@ async def _(bot: V11Bot, matcher: Matcher, arg: V11Msg = CommandArg()):
     if isinstance(result, str) and not result.startswith("base64://"):
         await matcher.finish(result)
 
-    if isinstance(bot, V11Bot):
-        await matcher.finish(V11MsgSeg.image(result))
+    if isinstance(bot, Bot):
+        await matcher.finish(MessageSegment.image(result))
     else:
         raise NotImplementedError

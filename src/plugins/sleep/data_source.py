@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from nonebot.adapters.onebot.v11 import MessageSegment
+from nonebot.adapters.milky import MessageSegment
 from nonebot_plugin_orm import get_session
 from sqlalchemy import func, select
 
@@ -195,11 +195,10 @@ async def get_morning_msg(uid: int, gid: int) -> MessageSegment:
                 return MessageSegment.text(msg)
 
         # 检查超级早起限制
-        if not settings.morning_super_get_up_enable:
-            if is_within_time_range(
-                last_sleep_time, now_time, settings.morning_super_get_up_interval
-            ):
-                return MessageSegment.text("睡这么点没关系吗？要不再睡一会吧... /_ \\")
+        if not settings.morning_super_get_up_enable and is_within_time_range(
+                        last_sleep_time, now_time, settings.morning_super_get_up_interval
+                    ):
+            return MessageSegment.text("睡这么点没关系吗？要不再睡一会吧... /_ \\")
 
     # 执行早安更新
     num, server_rank, sleep_duration = await morning_and_update(uid, gid, now_time)
@@ -272,9 +271,7 @@ async def get_night_msg(uid: int, gid: int) -> MessageSegment:
     async with get_session() as session:
         stmt = select(SleepUserModel).where(SleepUserModel.user_id == uid)
         result = await session.execute(stmt)
-        target_user = result.scalar_one_or_none()
-
-        if target_user:
+        if target_user := result.scalar_one_or_none():
             # 检查晚安间隔限制
             if settings.night_good_sleep_enable and target_user.night_time:
                 night_time = ensure_timezone_aware(target_user.night_time)
@@ -368,20 +365,18 @@ async def get_weekly_sleep_data(uid: int) -> WeeklySleepData | None:
     async with get_session() as session:
         stmt = select(SleepUserModel).where(SleepUserModel.user_id == uid)
         result = await session.execute(stmt)
-        target_user = result.scalar_one_or_none()
-
-        if not target_user:
+        if target_user := result.scalar_one_or_none():
+            return WeeklySleepData(
+                weekly_sleep_time=target_user.weekly_sleep_time or 0,
+                weekly_morning_count=target_user.weekly_morning_cout or 0,
+                weekly_night_count=target_user.weekly_night_cout or 0,
+                weekly_earliest_morning=target_user.weekly_earliest_morning_time,
+                weekly_latest_night=target_user.weekly_latest_night_time,
+                lastweek_sleep_time=target_user.lastweek_sleep_time or 0,
+                lastweek_morning_count=target_user.lastweek_morning_cout or 0,
+                lastweek_night_count=target_user.lastweek_night_cout or 0,
+                lastweek_earliest_morning=target_user.lastweek_earliest_morning_time,
+                lastweek_latest_night=target_user.lastweek_latest_night_time,
+            )
+        else:
             return None
-
-        return WeeklySleepData(
-            weekly_sleep_time=target_user.weekly_sleep_time or 0,
-            weekly_morning_count=target_user.weekly_morning_cout or 0,
-            weekly_night_count=target_user.weekly_night_cout or 0,
-            weekly_earliest_morning=target_user.weekly_earliest_morning_time,
-            weekly_latest_night=target_user.weekly_latest_night_time,
-            lastweek_sleep_time=target_user.lastweek_sleep_time or 0,
-            lastweek_morning_count=target_user.lastweek_morning_cout or 0,
-            lastweek_night_count=target_user.lastweek_night_cout or 0,
-            lastweek_earliest_morning=target_user.lastweek_earliest_morning_time,
-            lastweek_latest_night=target_user.lastweek_latest_night_time,
-        )

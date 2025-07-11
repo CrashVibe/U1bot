@@ -1,9 +1,8 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional, Tuple
 
-from nonebot import get_bots, logger
+from nonebot import get_bots
 from nonebot.adapters import Bot as BaseBot
 from nonebot.matcher import current_bot
 
@@ -18,9 +17,9 @@ from ..util import format_timedelta
 from . import normal_collector
 
 try:
-    from nonebot.adapters.onebot.v11 import Bot as OBV11Bot
+    from nonebot.adapters.milky import Bot as MilkyBot
 except ImportError:
-    OBV11Bot = None
+    MilkyBot = None
 
 
 @dataclass
@@ -31,27 +30,6 @@ class BotStatus:
     bot_connected: str
     msg_rec: str
     msg_sent: str
-
-
-async def get_ob11_msg_num(bot: BaseBot) -> Tuple[Optional[int], Optional[int]]:
-    if not (config.ps_ob_v11_use_get_status and OBV11Bot and isinstance(bot, OBV11Bot)):
-        return None, None
-
-    try:
-        bot_stat = (await bot.get_status()).get("stat")
-    except Exception as e:
-        logger.warning(
-            f"Error when getting bot status: {e.__class__.__name__}: {e}",
-        )
-        return None, None
-    if not bot_stat:
-        return None, None
-
-    msg_rec = bot_stat.get("message_received") or bot_stat.get(
-        "MessageReceived",
-    )
-    msg_sent = bot_stat.get("message_sent") or bot_stat.get("MessageSent")
-    return msg_rec, msg_sent
 
 
 async def get_bot_status(bot: BaseBot, now_time: datetime) -> BotStatus:
@@ -66,11 +44,8 @@ async def get_bot_status(bot: BaseBot, now_time: datetime) -> BotStatus:
         else "未知"
     )
 
-    msg_rec, msg_sent = await get_ob11_msg_num(bot)
-    if msg_rec is None:
-        msg_rec = recv_num.get(bot.self_id)
-    if msg_sent is None:
-        msg_sent = send_num.get(bot.self_id)
+    msg_rec = recv_num.get(bot.self_id)
+    msg_sent = send_num.get(bot.self_id)
     msg_rec = "未知" if (msg_rec is None) else str(msg_rec)
     msg_sent = "未知" if (msg_sent is None) else str(msg_sent)
 
@@ -85,7 +60,7 @@ async def get_bot_status(bot: BaseBot, now_time: datetime) -> BotStatus:
 
 
 @normal_collector()
-async def bots() -> List[BotStatus]:
+async def bots() -> list[BotStatus]:
     now_time = datetime.now().astimezone()
     return (
         [await get_bot_status(current_bot.get(), now_time)]

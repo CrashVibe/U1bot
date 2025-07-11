@@ -16,7 +16,7 @@ def write_debug_file(filename: str, content: Any):
         DEBUG_DIR.mkdir(parents=True)
     filename = filename.format(time=round(time.time() * 1000))
     path = DEBUG_DIR / filename
-    if isinstance(content, (bytes, bytearray)):
+    if isinstance(content, bytes | bytearray):
         path.write_bytes(content)
         return
     path.write_text(

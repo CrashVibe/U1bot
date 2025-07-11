@@ -1,3 +1,5 @@
+from typing import Union
+
 from cookit.loguru import warning_suppress
 from nonebot_plugin_alconna.uniseg import UniMessage
 
@@ -13,7 +15,7 @@ PLAYLIST_TIP = "\n使用指令 `resolve` 选择内容播放"
 
 
 async def construct_info_msg(
-    it: BaseSong | BasePlaylist,
+    it: Union[BaseSong, BasePlaylist],
     tip_command: bool = True,
 ) -> UniMessage:
     tip = (
@@ -41,15 +43,8 @@ async def send_song(song: BaseSong):
         if config.ncm_send_media:
             with warning_suppress(f"Send {song} file failed"):
                 receipt = await send_song_media(song)
-        reply = None
-        if receipt and (receipt is not ...):
-            r = receipt.get_reply()
-            if isinstance(r, list):
-                reply = r[0] if r else None
-            else:
-                reply = r
         await (await construct_info_msg(song, tip_command=(receipt is ...))).send(
-            reply_to=reply,
+            reply_to=receipt.get_reply() if receipt and (receipt is not ...) else None,
         )
 
     await send()

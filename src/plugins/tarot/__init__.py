@@ -1,6 +1,6 @@
-from nonebot import logger, on_command, on_regex
-from nonebot.adapters.onebot.v11 import Bot
-from nonebot.adapters.onebot.v11.event import GroupMessageEvent, MessageEvent
+from nonebot import on_command, on_regex
+from nonebot.adapters.milky import Bot
+from nonebot.adapters.milky.event import GroupMessageEvent, MessageEvent
 from nonebot.matcher import Matcher
 from nonebot.permission import SUPERUSER
 from nonebot.plugin import PluginMetadata

@@ -21,13 +21,15 @@ if TYPE_CHECKING:
 async def download_song(info: "SongInfo"):
     filename = info.download_filename
     file_path = SONG_CACHE_DIR / filename
-    if not file_path.exists():
-        async with AsyncClient(follow_redirects=True) as cli:
-            async with cli.stream("GET", info.playable_url) as resp:
-                resp.raise_for_status()
-                with file_path.open("wb") as f:
-                    async for chunk in resp.aiter_bytes():
-                        f.write(chunk)
+    if file_path.exists():
+        return file_path
+
+    async with AsyncClient(follow_redirects=True) as cli, cli.stream("GET", info.playable_url) as resp:  # fmt: skip
+        resp.raise_for_status()
+        SONG_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with file_path.open("wb") as f:
+            async for chunk in resp.aiter_bytes():
+                f.write(chunk)
     return file_path
 
 
@@ -55,7 +57,6 @@ async def get_current_ev_receipt(msg_ids: Any):
         context=ev,
         exporter=exporter,
         msg_ids=msg_ids if isinstance(msg_ids, list) else [msg_ids],
-        uni_factory=UniMessage,
     )
 
 
@@ -63,7 +64,7 @@ async def send_song_media_telegram(info: "SongInfo", as_file: bool = False):
     return await send_song_media_uni_msg(await download_song(info), info, as_file=False)
 
 
-async def send_song_media_onebot_v11(info: "SongInfo", as_file: bool = False):
+async def send_song_media_milky(info: "SongInfo", as_file: bool = False):
     async def send_voice():
         if not await ffmpeg_exists():
             logger.warning(
@@ -76,27 +77,23 @@ async def send_song_media_onebot_v11(info: "SongInfo", as_file: bool = False):
         ).send()
 
     async def send_file():
-        from nonebot.adapters.onebot.v11 import (
-            Bot as OB11Bot,
+        from nonebot.adapters.milky import (
+            Bot as MilkyBot,
         )
-        from nonebot.adapters.onebot.v11 import (
+        from nonebot.adapters.milky import (
+            FriendMessageEvent,
             GroupMessageEvent,
-            PrivateMessageEvent,
         )
 
-        bot = cast(OB11Bot, current_bot.get())
+        bot = cast(MilkyBot, current_bot.get())
         event = current_event.get()
 
-        if not isinstance(event, GroupMessageEvent | PrivateMessageEvent):
+        if not isinstance(event, (GroupMessageEvent, FriendMessageEvent)):
             raise TypeError("Event not supported")
 
-        file = (
-            (await download_song(info))
-            if config.ncm_ob_v11_local_mode
-            else cast(str, (await bot.download_file(url=info.playable_url))["file"])
-        )
+        file = await download_song(info)
 
-        if isinstance(event, PrivateMessageEvent):
+        if isinstance(event, FriendMessageEvent):
             await bot.upload_private_file(
                 user_id=event.user_id,
                 file=file,
@@ -120,7 +117,7 @@ async def send_song_media_platform_specific(
     adapter_name = bot.adapter.get_name()
     processors = {
         "Telegram": send_song_media_telegram,
-        "OneBot V11": send_song_media_onebot_v11,
+        "Milky": send_song_media_milky,
     }
     if adapter_name not in processors:
         raise TypeError("This adapter is not supported")

@@ -4,7 +4,7 @@ import io
 
 import httpx
 from nonebot import logger
-from nonebot.adapters.onebot.v11 import Message
+from nonebot.adapters import Message
 from pil_utils import Text2Image
 
 defualt_md5 = "acef72340ac0e914090bd35799f5594e"

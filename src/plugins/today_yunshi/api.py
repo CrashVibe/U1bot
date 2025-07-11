@@ -35,10 +35,11 @@ async def get_user_luck_star(user_id: str) -> int | None:
             ):
                 async with aiofiles.open(luckpath, encoding="utf-8") as f:
                     luckdata = json.loads(await f.read())
-                    luck_star_num = (
-                        luckdata.get(str(luck.luckid), {}).get("星级", "").count("★")
+                    return (
+                        luckdata.get(str(luck.luckid), {})
+                        .get("星级", "")
+                        .count("★")
                     )
-                    return luck_star_num
     except (OSError, json.JSONDecodeError) as e:
         print(f"Error reading or parsing luck data: {e}")
 
@@ -66,8 +67,7 @@ async def get_user_luck_info(user_id: str) -> dict | None:
             ):
                 async with aiofiles.open(luckpath, encoding="utf-8") as f:
                     luckdata = json.loads(await f.read())
-                    luck_info = luckdata.get(str(luck.luckid))
-                    if luck_info:
+                    if luck_info := luckdata.get(str(luck.luckid)):
                         return {
                             "luckid": luck.luckid,
                             "star_count": luck_info.get("星级", "").count("★"),

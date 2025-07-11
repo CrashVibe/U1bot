@@ -1,9 +1,8 @@
-# ruff: noqa: E402
-
 from nonebot import get_driver
 from nonebot.plugin import PluginMetadata
 
-from . import __main__ as __main__, misc_statistics as misc_statistics
+from . import __main__ as __main__
+from . import misc_statistics as misc_statistics
 from .bg_provider import bg_preloader
 from .collectors import (
     enable_collectors,

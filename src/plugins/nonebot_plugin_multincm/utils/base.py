@@ -1,28 +1,25 @@
 import asyncio
-import json
 import math
-import time
-from typing import TYPE_CHECKING, Any, TypeVar
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional, TypeVar
+from typing_extensions import ParamSpec
 
-from cookit import flatten
-from nonebot.adapters import Bot as BaseBot
-from nonebot.adapters import Event as BaseEvent
+from cookit import DebugFileWriter, flatten
+from nonebot.adapters import Bot as BaseBot, Event as BaseEvent
 from nonebot.matcher import current_bot
 from nonebot.utils import run_sync
 from nonebot_plugin_alconna.uniseg import SupportScope, UniMessage
-from typing_extensions import ParamSpec
 from yarl import URL
 
 from ..config import config
-from ..const import DEBUG_DIR, DEBUG_ROOT_DIR
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from ..data_source import md
 
 P = ParamSpec("P")
 TR = TypeVar("TR")
+
+debug = DebugFileWriter(Path.cwd() / "debug", "multincm")
 
 
 def format_time(time: int) -> str:
@@ -31,7 +28,7 @@ def format_time(time: int) -> str:
     return f"{mm:0>2d}:{ss:0>2d}"
 
 
-def format_alias(name: str, alias: list[str] | None = None) -> str:
+def format_alias(name: str, alias: Optional[list[str]] = None) -> str:
     return f"{name}（{'；'.join(alias)}）" if alias else name
 
 
@@ -55,26 +52,6 @@ def calc_min_max_index(page: int) -> tuple[int, int]:
 
 def calc_max_page(total: int) -> int:
     return math.ceil(total / config.ncm_list_limit)
-
-
-def is_debug_mode() -> bool:
-    return DEBUG_ROOT_DIR.exists() and DEBUG_ROOT_DIR.is_dir()
-
-
-def write_debug_file(filename: str, content: Any):
-    filename = filename.format(time=round(time.time() * 1000))
-    path = DEBUG_DIR / filename
-    if isinstance(content, bytes | bytearray):
-        path.write_bytes(content)
-        return
-    path.write_text(
-        (
-            content
-            if isinstance(content, str)
-            else json.dumps(content, ensure_ascii=False)
-        ),
-        "u8",
-    )
 
 
 def get_thumb_url(url: str, size: int = 64) -> str:
@@ -125,7 +102,7 @@ async def encode_silk(path: "Path", rate: int = 24000) -> "Path":
         )
 
     try:
-        from pysilk import encode # type: ignore
+        from pysilk import encode
 
         await run_sync(encode)(pcm_path.open("rb"), silk_path.open("wb"), rate, rate)
     finally:
@@ -143,10 +120,10 @@ def merge_alias(song: "md.Song") -> list[str]:
 
 
 def is_song_card_supported(
-    bot: BaseBot | None = None,
-    event: BaseEvent | None = None,
+    bot: Optional[BaseBot] = None,
+    event: Optional[BaseEvent] = None,
 ) -> bool:
     if bot is None:
         bot = current_bot.get()
     s = UniMessage.get_target(event, bot).scope
-    return not not s and s == SupportScope.qq_client.value
+    return bool(s and s == SupportScope.qq_client.value)

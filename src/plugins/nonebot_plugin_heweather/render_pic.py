@@ -1,7 +1,6 @@
 import platform
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 from nonebot_plugin_htmlrender import template_to_pic
 
@@ -14,9 +13,8 @@ async def render(weather: Weather) -> bytes:
     template_path = str(Path(__file__).parent / "templates")
 
     air = None
-    if weather.air:
-        if weather.air.now:
-            air = add_tag_color(weather.air.now)
+    if weather.air and weather.air.now:
+        air = add_tag_color(weather.air.now)
 
     return await template_to_pic(
         template_path=template_path,
@@ -36,9 +34,9 @@ async def render(weather: Weather) -> bytes:
     )
 
 
-def add_hour_data(hourly: List[Hourly]):
-    min_temp = min([int(hour.temp) for hour in hourly])
-    high = max([int(hour.temp) for hour in hourly])
+def add_hour_data(hourly: list[Hourly]):
+    min_temp = min(int(hour.temp) for hour in hourly)
+    high = max(int(hour.temp) for hour in hourly)
     low = int(min_temp - (high - min_temp))
     for hour in hourly:
         date_time = datetime.fromisoformat(hour.fxTime)
@@ -57,7 +55,7 @@ def add_hour_data(hourly: List[Hourly]):
     return hourly
 
 
-def add_date(daily: List[Daily]):
+def add_date(daily: list[Daily]):
     week_map = [
         "周日",
         "周一",

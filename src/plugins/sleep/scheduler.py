@@ -9,7 +9,7 @@ from .models import SleepGroupModel, SleepUserModel
 
 
 async def group_daily_refresh() -> None:
-    """每日早晚安刷新 - 优化版本"""
+    """每日早晚安刷新"""
     from nonebot_plugin_orm import get_session
     from sqlalchemy import delete
 
@@ -24,7 +24,7 @@ async def group_daily_refresh() -> None:
 
 
 async def user_weekly_refresh() -> None:
-    """每周早晚安刷新 - 优化版本"""
+    """每周早晚安刷新"""
     from nonebot_plugin_orm import get_session
     from sqlalchemy import update
 

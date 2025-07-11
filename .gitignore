@@ -143,3 +143,4 @@ run.sh
 .env
 .vscode
 aerich_config.py
+.DS_Store

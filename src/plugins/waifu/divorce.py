@@ -4,7 +4,7 @@ from datetime import datetime
 
 from cachetools import TTLCache
 from nonebot import on_command, require
-from nonebot.adapters.onebot.v11 import GroupMessageEvent
+from nonebot.adapters.milky.event import GroupMessageEvent
 
 require("nonebot_plugin_orm")
 from nonebot_plugin_orm import get_session
@@ -13,12 +13,9 @@ from sqlalchemy import delete, select
 from ..coin.api import subtract_coin
 from .models import WaifuLock, WaifuRelationship
 
-# 初始化全局缓存
 last_reset_cache = TTLCache(maxsize=1000, ttl=86400)  # 24小时过期
 cd_cache = TTLCache(maxsize=1000, ttl=3600)  # 1小时过期
-# 新增：离婚次数缓存，key为user_id，ttl为2天，防止跨天后还残留
 divorce_count_cache = TTLCache(maxsize=2000, ttl=172800)
-# 新增：记录上次清零日期
 divorce_last_reset_date = datetime.now().strftime("%Y%m%d")
 
 bye = on_command("离婚", aliases={"分手"}, block=True)
@@ -27,8 +24,8 @@ bye = on_command("离婚", aliases={"分手"}, block=True)
 @bye.handle()
 async def handle_divorce(event: GroupMessageEvent):
     global divorce_last_reset_date
-    user_id = event.user_id
-    group_id = event.group_id
+    user_id = event.data.sender_id
+    group_id = event.data.peer_id
 
     # 检查是否需要清空离婚次数缓存（每天0点）
     today = datetime.now().strftime("%Y%m%d")
@@ -113,9 +110,7 @@ async def process_divorce(group_id: int, user_id: int):
             .limit(1)
         )
         relationship_result = await session.execute(relationship_stmt)
-        relationship = relationship_result.scalar_one_or_none()
-
-        if relationship:
+        if relationship := relationship_result.scalar_one_or_none():
             # 确定双方的ID
             if relationship.user_id == user_id:
                 partner_id = relationship.partner_id

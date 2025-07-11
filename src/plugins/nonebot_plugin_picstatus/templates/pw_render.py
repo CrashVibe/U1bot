@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 from urllib.parse import urlencode
 
 import jinja2
@@ -32,7 +33,7 @@ base_router_group = RouterGroup()
 
 def resolve_file_url(
     path: str,
-    additional_locations: Optional[Dict[str, Path]] = None,
+    additional_locations: dict[str, Path] | None = None,
 ) -> str:
     if path.startswith("res:"):
         path = path[4:].lstrip("/")
@@ -46,8 +47,8 @@ def resolve_file_url(
 
 
 def make_file_router(
-    query_name: Optional[str] = None,
-    base_path: Optional[Path] = None,
+    query_name: str | None = None,
+    base_path: Path | None = None,
     prefix_omit: str = "",
 ) -> CKRouterFunc:
     @log_router_err()
@@ -122,7 +123,7 @@ def add_background_router(router_group: RouterGroup, bg: BgData):
 
 # region jinja
 
-global_jinja_filters: Dict[str, Callable] = all_filters.copy()
+global_jinja_filters: dict[str, Callable] = all_filters.copy()
 
 
 jinja_filter = make_append_func_to_dict_deco(global_jinja_filters)

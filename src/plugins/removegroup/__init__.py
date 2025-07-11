@@ -3,7 +3,8 @@
 import asyncio
 
 from nonebot import get_bots, logger, on_command
-from nonebot.adapters.onebot.v11 import Bot
+from nonebot.adapters.milky import Bot
+from nonebot.adapters.milky.model.common import Friend, Group, Member
 from nonebot.exception import FinishedException
 from nonebot.permission import SUPERUSER
 
@@ -18,38 +19,33 @@ BOT_PRIORITY = {
 rlist = on_command("removegrouplist", permission=SUPERUSER)
 
 
-def condition(group_info):
-    member_count = group_info["member_count"]
-    group_name: str = group_info["group_name"]
+def condition(group_info: Group) -> bool:
+    member_count = group_info.member_count
+    group_name: str = group_info.name
     return (
-        (
-            member_count < 10
-            or (
-                ("机器人" in group_name or "ai" in group_name or "test" in group_name)
-                and len(group_name) < 8
-            )
-            or group_name.count("、") >= 2
+        member_count < 10
+        or (
+            ("机器人" in group_name or "ai" in group_name or "test" in group_name)
+            and len(group_name) < 8
         )
-        and group_info["group_id"] != 966016220
-        and group_info["group_id"] != 713478803
-    )
+        or group_name.count("、") >= 2
+    ) and group_info.group_id not in (966016220, 713478803)
 
 
-async def get_group_member_list_safe(bot: Bot, group_id: int) -> list[int]:
+async def get_group_member_list_safe(bot: Bot, group_id: int) -> list[Member]:
     """安全获取群成员列表"""
     try:
-        group_member_list = await bot.get_group_member_list(group_id=group_id)
-        return [member["user_id"] for member in group_member_list]
+        return await bot.get_group_member_list(group_id=group_id)
     except Exception as e:
         logger.warning(f"获取群 {group_id} 成员列表失败: {e}")
         return []
 
 
 async def batch_get_group_members(
-    bot: Bot, group_list: list, batch_size: int = 10
-) -> dict[int, list[int]]:
+    bot: Bot, group_list: list[Group], batch_size: int = 10
+) -> dict[Group, list[Member]]:
     """并发批量获取群成员列表"""
-    group_member_lists = {}
+    group_members_mapping = {}
     total_groups = len(group_list)
 
     for i in range(0, total_groups, batch_size):
@@ -57,19 +53,18 @@ async def batch_get_group_members(
 
         # 并发获取这一批群的成员列表
         tasks = [
-            get_group_member_list_safe(bot, group_info["group_id"])
-            for group_info in batch
+            get_group_member_list_safe(bot, group_info.group_id) for group_info in batch
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # 处理结果
-        for j, (group_info, result) in enumerate(zip(batch, results)):
+        for group_info, result in zip(batch, results):
             if isinstance(result, Exception):
-                logger.error(f"获取群 {group_info['group_id']} 成员列表异常: {result}")
-                group_member_lists[group_info["group_id"]] = []
+                logger.error(f"获取群 {group_info.group_id} 成员列表异常: {result}")
+                group_members_mapping[group_info] = []
             else:
-                group_member_lists[group_info["group_id"]] = result
+                group_members_mapping[group_info] = result
 
         # 输出进度
         completed = min(i + batch_size, total_groups)
@@ -80,12 +75,12 @@ async def batch_get_group_members(
         if i + batch_size < total_groups:
             await asyncio.sleep(0.5)
 
-    return group_member_lists
+    return group_members_mapping
 
 
 async def analyze_groups(
-    bot: Bot, group_list: list, friend_list_qq: list[int]
-) -> tuple[list[dict], list[dict]]:
+    bot: Bot, group_list: list[Group], friend_list: list[Friend]
+) -> tuple[list[Group], list[Group]]:
     """并发分析群组，返回需要处理的群组"""
     # 检查人数条件的群组
     member_count_groups = []
@@ -94,45 +89,34 @@ async def analyze_groups(
     no_friend_groups = []
 
     # 并发获取所有群成员列表
-    group_member_lists = await batch_get_group_members(bot, group_list)
+    group_members_mapping = await batch_get_group_members(bot, group_list)
 
-    friend_set = set(friend_list_qq)
+    # 创建好友QQ号集合以便比较
+    friend_qq_set: set[int] = {friend.user_id for friend in friend_list}
 
     # 分析每个群组
     for group_info in group_list:
-        group_id = group_info["group_id"]
-        member_count = group_info["member_count"]
-        group_name = group_info["group_name"]
+        group_id = group_info.group_id
+        member_count = group_info.member_count
 
         # 检查人数条件
         if condition(group_info):
-            member_count_groups.append(
-                {
-                    "group_id": group_id,
-                    "group_name": group_name,
-                    "member_count": member_count,
-                    "reason": "人数或名称条件",
-                }
-            )
+            member_count_groups.append(group_info)
 
         # 检查好友条件
-        group_member_list_qq = group_member_lists.get(group_id, [])
-        group_member_set = set(group_member_list_qq)
-        intersection = friend_set & group_member_set
+        group_member_list = group_members_mapping.get(group_info, [])
+        # 将群成员转换为QQ号集合
+        member_qq_set = {member.user_id for member in group_member_list}
+        intersection = friend_qq_set & member_qq_set
 
         if not intersection:
-            no_friend_groups.append(
-                {
-                    "group_id": group_id,
-                    "group_name": group_name,
-                    "member_count": member_count,
-                    "reason": "无共同好友",
-                }
-            )
+            no_friend_groups.append(group_info)
 
         # 输出分析进度
         progress = (group_list.index(group_info) + 1) / len(group_list) * 100
-        intersection_ratio = len(intersection) / len(friend_set) if friend_set else 0
+        intersection_ratio = (
+            len(intersection) / len(friend_qq_set) if friend_qq_set else 0
+        )
         logger.info(
             f"分析进度: {progress:.1f}% 群:{group_id} 成员:{member_count} "
             f"好友交集:{len(intersection)} 占比:{intersection_ratio:.2f}"
@@ -149,15 +133,14 @@ async def _(bot: Bot):
         # 获取群列表和好友列表
         group_list = await bot.get_group_list()
         friend_list = await bot.get_friend_list()
-        friend_list_qq = [friend["user_id"] for friend in friend_list]
 
         await rlist.send(
-            f"📊 共有 {len(group_list)} 个群组，{len(friend_list_qq)} 个好友，开始并发分析..."
+            f"📊 共有 {len(group_list)} 个群组，{len(friend_list)} 个好友，开始并发分析..."
         )
 
         # 并发分析群组
         member_count_groups, no_friend_groups = await analyze_groups(
-            bot, group_list, friend_list_qq
+            bot, group_list, friend_list
         )
 
         # 合并输出结果
@@ -167,11 +150,10 @@ async def _(bot: Bot):
             messages.append(
                 f"📉 人数/名称条件不符合的群组 ({len(member_count_groups)} 个):"
             )
-            for group in member_count_groups[:10]:  # 最多显示10个
-                messages.append(
-                    f"  群号: {group['group_id']} | 群名: {group['group_name']} | "
-                    f"成员: {group['member_count']} | 原因: {group['reason']}"
-                )
+            messages.extend(
+                f"  群号: {group.group_id} | 群名: {group.name} | 成员: {group.member_count} | 原因: 人数或名称条件"
+                for group in member_count_groups[:10]
+            )
             if len(member_count_groups) > 10:
                 messages.append(f"  ... 还有 {len(member_count_groups) - 10} 个群组")
         else:
@@ -181,11 +163,10 @@ async def _(bot: Bot):
 
         if no_friend_groups:
             messages.append(f"👥 无共同好友的群组 ({len(no_friend_groups)} 个):")
-            for group in no_friend_groups[:10]:  # 最多显示10个
-                messages.append(
-                    f"  群号: {group['group_id']} | 群名: {group['group_name']} | "
-                    f"成员: {group['member_count']} | 原因: {group['reason']}"
-                )
+            messages.extend(
+                f"  群号: {group.group_id} | 群名: {group.name} | 成员: {group.member_count} | 原因: 无共同好友"
+                for group in no_friend_groups[:10]
+            )
             if len(no_friend_groups) > 10:
                 messages.append(f"  ... 还有 {len(no_friend_groups) - 10} 个群组")
         else:
@@ -221,7 +202,7 @@ async def _(bot: Bot):
 async def leave_group_safe(bot: Bot, group_id: int) -> tuple[int, bool, str]:
     """安全退出群组"""
     try:
-        await bot.set_group_leave(group_id=group_id)
+        await bot.quit_group(group_id=group_id)
         return group_id, True, "成功退出"
     except Exception as e:
         logger.warning(f"退出群 {group_id} 失败: {e}")
@@ -229,8 +210,8 @@ async def leave_group_safe(bot: Bot, group_id: int) -> tuple[int, bool, str]:
 
 
 async def batch_leave_groups(
-    bot: Bot, groups_to_remove: list[dict], batch_size: int = 5
-) -> tuple[list[dict], list[dict]]:
+    bot: Bot, groups_to_remove: list[Group], batch_size: int = 5
+) -> tuple[list[Group], list[tuple[Group, str]]]:
     """并发批量退出群组"""
     success_groups = []
     failed_groups = []
@@ -240,22 +221,22 @@ async def batch_leave_groups(
         batch = groups_to_remove[i : i + batch_size]
 
         # 并发退出这一批群组
-        tasks = [leave_group_safe(bot, group["group_id"]) for group in batch]
+        tasks = [leave_group_safe(bot, group.group_id) for group in batch]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # 处理结果
         for group, result in zip(batch, results):
             if isinstance(result, Exception):
-                failed_groups.append({**group, "error": str(result)})
+                failed_groups.append((group, str(result)))
             elif isinstance(result, tuple) and len(result) == 3:
                 group_id, success, message = result
                 if success:
-                    success_groups.append({**group, "message": message})
+                    success_groups.append(group)
                 else:
-                    failed_groups.append({**group, "error": message})
+                    failed_groups.append((group, message))
             else:
-                failed_groups.append({**group, "error": "未知结果格式"})
+                failed_groups.append((group, "未知结果格式"))
 
         # 输出进度
         completed = min(i + batch_size, total_groups)
@@ -278,15 +259,14 @@ async def _(bot: Bot):
 
     try:
         # 获取群列表和好友列表
-        group_list = await bot.get_group_list()
-        friend_list = await bot.get_friend_list()
-        friend_list_qq = [friend["user_id"] for friend in friend_list]
+        group_list: list[Group] = await bot.get_group_list()
+        friend_list: list[Friend] = await bot.get_friend_list()
 
         await rgroup.send(f"📊 共有 {len(group_list)} 个群组，开始分析...")
 
         # 并发分析群组
         member_count_groups, no_friend_groups = await analyze_groups(
-            bot, group_list, friend_list_qq
+            bot, group_list, friend_list
         )
 
         # 合并要移除的群组
@@ -307,21 +287,19 @@ async def _(bot: Bot):
 
         if success_groups:
             messages.append(f"✅ 成功退出的群组 ({len(success_groups)} 个):")
-            for group in success_groups[:15]:  # 最多显示15个
-                messages.append(
-                    f"  ✓ {group['group_id']} | {group['group_name']} | "
-                    f"成员:{group['member_count']} | {group['reason']}"
-                )
+            messages.extend(
+                f"  ✓ {group.group_id} | {group.name} | 成员:{group.member_count} | 原因:符合移除条件"
+                for group in success_groups[:15]
+            )
             if len(success_groups) > 15:
                 messages.append(f"  ... 还有 {len(success_groups) - 15} 个群组")
 
         if failed_groups:
             messages.append(f"\n❌ 退出失败的群组 ({len(failed_groups)} 个):")
-            for group in failed_groups[:10]:  # 最多显示10个
-                messages.append(
-                    f"  ✗ {group['group_id']} | {group['group_name']} | "
-                    f"错误: {group['error'][:50]}..."
-                )
+            messages.extend(
+                f"  ✗ {group.group_id} | {group.name} | 错误: {error[:50]}..."
+                for group, error in failed_groups[:10]
+            )
             if len(failed_groups) > 10:
                 messages.append(f"  ... 还有 {len(failed_groups) - 10} 个群组")
 
@@ -352,7 +330,7 @@ async def _(bot: Bot):
     await rgroup.finish("🎯 群组移除操作完成!")
 
 
-async def get_all_bots_groups() -> dict[int, list[dict]]:
+async def get_all_bots_groups() -> dict[int, list[Group]]:
     """获取所有机器人的群组信息"""
     bots = get_bots()
     all_bot_groups = {}
@@ -361,7 +339,7 @@ async def get_all_bots_groups() -> dict[int, list[dict]]:
         try:
             # 将bot_id转换为整数
             bot_id_int = int(bot_id)
-            group_list = await bot.get_group_list()
+            group_list: list[Group] = await bot.get_group_list()
             all_bot_groups[bot_id_int] = group_list
             logger.info(f"机器人 {bot_id_int} 加入了 {len(group_list)} 个群组")
         except Exception as e:
@@ -372,30 +350,26 @@ async def get_all_bots_groups() -> dict[int, list[dict]]:
 
 
 async def find_duplicate_groups(
-    all_bot_groups: dict[int, list[dict]],
+    all_bot_groups: dict[int, list[Group]],
 ) -> dict[int, list[int]]:
     """查找重复的群组"""
-    group_to_bots = {}  # {group_id: [bot_id1, bot_id2, ...]}
+    group_to_bots: dict[int, list[int]] = {}
 
     # 收集所有群组和对应的机器人
     for bot_id, groups in all_bot_groups.items():
         for group in groups:
-            group_id = group["group_id"]
-            # 跳过免疫群组
-            if group_id == 966016220 or group_id == 713478803:
+            group_id = group.group_id
+            if group_id in (966016220, 713478803):
                 continue
             if group_id not in group_to_bots:
                 group_to_bots[group_id] = []
             group_to_bots[group_id].append(bot_id)
 
-    # 找出有多个机器人的群组
-    duplicate_groups = {
+    return {
         group_id: bot_list
         for group_id, bot_list in group_to_bots.items()
         if len(bot_list) > 1
     }
-
-    return duplicate_groups
 
 
 async def determine_bots_to_remove(
@@ -418,8 +392,9 @@ async def determine_bots_to_remove(
             f"群 {group_id}: 保留机器人 {highest_priority_bot}，移除 {bots_to_remove_from_group}"
         )
 
-        for bot_id in bots_to_remove_from_group:
-            bots_to_remove.append((bot_id, group_id))
+        bots_to_remove.extend(
+            (bot_id, group_id) for bot_id in bots_to_remove_from_group
+        )
 
     return bots_to_remove
 
@@ -441,12 +416,11 @@ async def batch_remove_bots_from_groups(
         for bot_id, group_id in batch:
             if str(bot_id) in bots:
                 bot = bots[str(bot_id)]
-                # 检查是否是OneBot V11适配器
-                if hasattr(bot, "set_group_leave"):
+                if isinstance(bot, Bot):
                     tasks.append(remove_bot_from_group_safe(bot, group_id, bot_id))
                 else:
-                    failed_removals.append(
-                        (bot_id, group_id, f"机器人 {bot_id} 不支持OneBot V11协议")
+                    raise TypeError(
+                        f"Bot {bot_id} is not an instance of Bot, got {type(bot)}"
                     )
             else:
                 failed_removals.append((bot_id, group_id, f"机器人 {bot_id} 不在线"))
@@ -454,7 +428,7 @@ async def batch_remove_bots_from_groups(
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for j, ((bot_id, group_id), result) in enumerate(zip(batch, results)):
+            for (bot_id, group_id), result in zip(batch, results):
                 if isinstance(result, Exception):
                     failed_removals.append((bot_id, group_id, str(result)))
                 elif isinstance(result, tuple) and len(result) == 3:
@@ -477,11 +451,11 @@ async def batch_remove_bots_from_groups(
 
 
 async def remove_bot_from_group_safe(
-    bot, group_id: int, bot_id: int
+    bot: Bot, group_id: int, bot_id: int
 ) -> tuple[int, bool, str]:
     """安全地从群组中移除机器人"""
     try:
-        await bot.set_group_leave(group_id=group_id)
+        await bot.quit_group(group_id=group_id)
         return bot_id, True, "成功退出群组"
     except Exception as e:
         logger.warning(f"机器人 {bot_id} 退出群 {group_id} 失败: {e}")
@@ -510,9 +484,7 @@ async def _(bot: Bot):
             await rdup_check.finish("✅ 没有发现重复的群组")
 
         # 生成报告
-        messages = []
-        messages.append(f"📊 发现 {len(duplicate_groups)} 个重复群组:")
-
+        messages = [f"📊 发现 {len(duplicate_groups)} 个重复群组:"]
         for group_id, bot_list in duplicate_groups.items():
             # 获取群组信息
             group_name = "未知"
@@ -521,9 +493,9 @@ async def _(bot: Bot):
             for bot_id in bot_list:
                 if bot_id in all_bot_groups:
                     for group in all_bot_groups[bot_id]:
-                        if group["group_id"] == group_id:
-                            group_name = group["group_name"]
-                            member_count = group["member_count"]
+                        if group.group_id == group_id:
+                            group_name = group.name
+                            member_count = group.member_count
                             break
                     break
 
@@ -535,10 +507,12 @@ async def _(bot: Bot):
             to_remove = sorted_bots[1:]
 
             messages.append(f"  群 {group_id} ({group_name}) - 成员: {member_count}")
-            messages.append(
-                f"    保留: {highest_priority} (优先级: {BOT_PRIORITY.get(highest_priority, 0)})"
+            messages.extend(
+                [
+                    f"    保留: {highest_priority} (优先级: {BOT_PRIORITY.get(highest_priority, 0)})",
+                    f"    移除: {to_remove}",
+                ]
             )
-            messages.append(f"    移除: {to_remove}")
 
         # 发送报告
         current_message = ""
@@ -604,17 +578,19 @@ async def _(bot: Bot):
 
         if success_removals:
             messages.append(f"✅ 成功移除 ({len(success_removals)} 个):")
-            for bot_id, group_id in success_removals[:10]:
-                messages.append(f"  ✓ 机器人 {bot_id} 已退出群 {group_id}")
+            messages.extend(
+                f"  ✓ 机器人 {bot_id} 已退出群 {group_id}"
+                for bot_id, group_id in success_removals[:10]
+            )
             if len(success_removals) > 10:
                 messages.append(f"  ... 还有 {len(success_removals) - 10} 个成功移除")
 
         if failed_removals:
             messages.append(f"\n❌ 移除失败 ({len(failed_removals)} 个):")
-            for bot_id, group_id, error in failed_removals[:10]:
-                messages.append(
-                    f"  ✗ 机器人 {bot_id} 退出群 {group_id} 失败: {error[:30]}..."
-                )
+            messages.extend(
+                f"  ✗ 机器人 {bot_id} 退出群 {group_id} 失败: {error[:30]}..."
+                for bot_id, group_id, error in failed_removals[:10]
+            )
             if len(failed_removals) > 10:
                 messages.append(f"  ... 还有 {len(failed_removals) - 10} 个失败")
 
