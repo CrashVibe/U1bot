@@ -85,10 +85,14 @@ async def _fishing(event: GroupMessageEvent | FriendMessageEvent, bot: Bot):
 
     user_id = event.get_user_id()
     fish = await choice(user_id=user_id)
-    await bot.send_group_message_reaction(
-        group_id=event.data.peer_id,
-        message_seq=event.message_id,
-        reaction="127881",
+
+    await fishing.send(
+        Message(
+            [
+                MessageSegment.reply(event.data.message_seq),
+                MessageSegment.text(f"* {Bot_NICKNAME} 正在钓鱼..."),
+            ],
+        ),
     )
 
     fish_name = fish[0]
